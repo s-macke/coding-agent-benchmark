@@ -10,7 +10,7 @@ Currently, the evaluation is done manually.
 2. [Refactor HTML into NPM Package](#2-refactor-html-into-npm-package)
 3. [BASIC Interpreter](#3-basic-interpreter)
 4. [MOS6502 Assembler Parser](#4-mos6502-assembler-parser)
-5. [Refactor Python into Go](#5-refactor-python-into-go)
+5. [Port Python Decompiler to Go](#5-port-python-decompiler-to-go)
 6. [Reverse Engineer Obfuscated Code](#6-reverse-engineer-obfuscated-code)
 
 ---
@@ -108,25 +108,48 @@ Seven example `.asm` files test various instructions and addressing modes.
 
 - Do all 7 example files (`simple_load.asm`, `arithmetic.asm`, `branch.asm`, etc.) assemble without errors?
 - Does the agent write unit tests?
-- Are the opcodes in `store.asm` correct? (verify against 6502 reference)
+- Are the opcodes in `store.asm` correct regarding page boundaries?
 - Does the agent handle label forward references correctly?
 - Does the agent use the provided `opcodes.go` or reimplement it?
+- How many passes does the assembler do?
+- Is the code architecture clean (separate lexer, parser, interpreter)?
 
 ---
 
-## 5. Refactor Python into Go
+## 5. Port Python Decompiler to Go
 
-Tests the agent's ability to translate idiomatic Python code into idiomatic Go.
+Tests the agent's ability to translate a complex Python codebase to idiomatic Go while preserving functionality.
 
-- **Folder:** `decompiler`
+- **Folder:** `refactor`
 - **Mode:** Plan
-- **Prompt:** *Not yet defined*
+- **Prompt:** `Port the 6502/ARM decompiler from Python to Go. Use GO_PORT_DESIGN.md as the architecture guide.`
 
-**Status:** This benchmark is planned but not yet populated with content.
+**Context:** The `decomp-6502-arm/` folder contains a Python decompiler (~12 files, ~3000 lines) that converts 6502/ARM machine code into C-like pseudocode through a multi-stage pipeline:
+
+```
+Binary → Instruction Tracing → SSA Conversion → Expression Trees → Control Flow Structuring → Code Generation
+```
+
+Key components:
+- `decomp.py` - Main entry point and CLI
+- `insn.py`, `insn_6502.py`, `insn_arm.py` - Instruction tracing and decoding
+- `ssa.py`, `ssa_6502.py`, `ssa_arm.py` - SSA form conversion
+- `expr.py` - Expression tree with 90+ operation types and simplification rules
+- `block.py` - Control flow structuring (if-then-else, loops)
+- `code.py` - C code generation
+
+A comprehensive `GO_PORT_DESIGN.md` provides the target architecture with Go struct definitions, package layout, and implementation notes.
+
+Test binaries in `test/` can verify the port produces identical output.
 
 ### Evaluate
 
-- *Not yet defined*
+- Does the Go port compile and run?
+- Does it produce identical output to the Python version on test binaries?
+- Does the agent follow the design document's package structure?
+- Is the Go code idiomatic (error handling, interfaces, no global state)?
+- Does the agent write unit tests?
+- How does the agent handle Python-specific patterns (dynamic typing, `None`, `isinstance()`)?
 
 ---
 
@@ -144,7 +167,6 @@ Tests the agent's ability to analyze and understand heavily obfuscated C code (I
 - Aggressive macro obfuscation (`#define` abuse)
 - Compressed variable names and cryptic formatting
 - Complex bitwise operations and pointer arithmetic
-- Terminal I/O (uses `termios.h`)
 - Hidden comments with clues ("haystack test", "Find the clue", "strawberry")
 
 A compiled binary `a` is included for reference.

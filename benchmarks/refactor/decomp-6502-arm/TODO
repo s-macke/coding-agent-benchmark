@@ -1,0 +1,267 @@
+=== TODO
+- when coding basic blocks, if a successor is containered, emit a goto
+  instead of coding it (it will be coded in its advanced block, and it
+  will probably look nicer; see random_funkyloop.bin)
+- compound type recovery:
+  - identify local variable frame DONE
+  - identify stack object bases DONE
+  - create SSAType class describing what we can find out about a type
+    and attach an instance to every definition DONE
+  - estimate stack object sizes DONE
+  - link scalar stack locations to stack objects DONE
+  - code scalar stack accesses as struct accesses DONE
+  - declare stack objects as compound data types DONE
+  - propagate compound type information to callees
+  - code compound type function arguments as such DONE
+- scalar type recovery:
+  - record access sizes
+  - record signed comparisons
+  - record use in indirect branches (function pointers)
+  - record dereferencing (data pointers)	DONE
+- propagate "unpropagatable" expressions in specific simple cases, e.g.
+  single uses in the next node (should often avoid unnecessary locals)
+- don't code assignments to stack parameters
+- simplify "if (a) {...} if (!a) {...}" to "if (a) {...} else {...}"
+  (often encountered due with conditional insns on ARM)
+- often temporary locals are created for registers clobbered by function
+  calls even though the semantics of C would not require them
+  (e.g. maskrom 0x21a4)
+- strategy for recognizing compound types not passed by reference: use of
+  the same pointer in different-sized accesses at different offsets
+- maskrom fun_3578 doesn't take any parameters, but all calls seem
+  to feel a need to pass some...
+- make thunks etc. clobber all registers (e.g. maskrom basC88C: call
+  clobbers R0, but previous value (a pointer) is still used for
+  comparison)
+- consider reading r15 a (data) pointer
+- sort function call arguments
+- sort return structure members
+- recover pointer-pointer types (e.g. maskrom fun_ebf0, but this really
+  is a struct pointer...)
+- unwarranted gotos: (maskrom)
+  - fun_08f8: can't structure because function call is not propagated
+  - fun_ebf0: code at ret_ef8c, ret_edf0 should be replicated instead
+  - guess_39b4: ret_3af8 should be replicated
+  - fun_2b24: unrecognized ITE
+  - fun_3578: condition before label_370c should be
+    "r0 == 0x10000007 || r0 == 0"
+  - fun_b800: ret_baf0 should be replicated
+  - fun_b800: "if(0) goto ..." should be eliminated (if correct)
+  - fun_f074: ret_f0c4 should be replicated
+  - fun_f074: condition before label_f0d0 should be inverted
+  - fun_1cac: unrecognized infinite loops at label_1e3c, label_1e24
+  - fun_1cac: nested loops label_1da0/label_1d20
+  - fun_40a8: invert condition
+  - fun_efa0: label_efd4 is a pre-tested loop (probably due to missing
+    function call propagation)
+  - fun_8398: condition before ret_8474 needs to be inverted
+  - guess_2be8: label_2d24 is a for(;;) loop
+  - TBC... (at fun_918c)
+- maskrom fun_d21c: unrecognized I/O
+- maskrom fun_b800: unused regparms must still be coded in header
+- simplify "~0x10000" and "<< 10 >> 10" to "(uint16_t)"
+- maskrom fun_40a8: simplify condition "r0 >= 764 & r0 != 764"
+
+=== REVIEW
+- check that all R13 reads are Expr(AUTO,'d
+- check that all R13 writes update sp/bp
+
+=== OPTIONAL
+- export graphs to graphviz:
+  - block graph for finding additional structures	DONE
+  - insn/statement graphs for verifying correctness
+- graphing: make entry point a different shape
+- don't use ssa.fun_args_d directly, implement methods
+- fun_0x8082: a8 is made explicit because fun_0x8edd() clobbers a, but we
+  ignore it, so we don't actually need the copy
+- copy single-insn blocks (label_81c5, for instance) instead of emitting
+  a goto
+- structure shortcut ITE conditions such as label_90dc
+
+=== LATER
+- detect volatile locations like in BCity:fun_d8f6
+- casting an uint8_t to a pointer is semi-bogus
+- operator precedence for type cast
+- unconditional loop at SMB:label_811b
+- f580: why is there a double arrow in advsequencef52c?
+- scale array accesses correctly as per data type (later because I fear
+  this might hide bugs (or become a hidden bug))
+
+=== DONE
+
+- don't DCE memory writes	DONE
+- don't DCE MMIO	DONE
+- implement default defs/uses for calls (defines all, uses all)	WONTFIX
+  - implement method to get all definitions	DONE
+  - allow more than one def per statement	DONE
+  - doesn't work: what is 'defines all' supposed to mean?	EXACTLY!
+  - find defs/returns instead (recursive on call op)	DONE
+- implement phi functions	DONE
+- implement propagation		DONE
+- implement proper reaching defs (current definitions include regs with
+  wrong indices, which is fine for returns, but hampers DCE)	DONE
+- pretty-print phi functions	DONE
+- implement expression simplification	DONE
+- fix tail call (see 0x8e2d in SMB1) <- that is not a tail call; anyway:
+  DONE (hopefully)
+- implement limited CSE (typical case: A(n) := A(m) - 1; bcc A(m) - 1)
+  for prettiness and to avoid unnecessary temps	DONE
+- speed up dephiing	DONE
+- speed up DCE	DONE (somewhat...)
+- eliminate duplicates when redefining returns	DONE (I think)
+- clip SSA trees when encountering conditional branches that are actually
+  unconditional after propagation	DONE
+- determine true returns	DONE (I hope)
+- propagate into ssadefs (first attempt failed miserably)	OBSOLETE
+  (did away with complex definitions)
+- make ssa statement next/comefrom lists!!! (undeterministic branching is
+  BAD!!)	DONE
+- find if/thens that have a dead end (return)	DONE
+- 81c6: why is the left sequence not extended by another block?	DONE
+  (iterative structuring)
+- 8004: why are bblocks ending in branches in a sequence?	WONTFIX
+  (they are single-block loops)
+- 8edd: loop in a sequence?	DONE (graphing error)
+- f41b:		DONE (I think, thanks to iterative structuring)
+  - if/then/else at f48d not recognized
+  - if/then at f4c2 not recognized
+- code branches explicitly, not at a bblock end (cf. bblock bas81A9)	DONE
+  (I think, I don't see anything relevant in bas81A9, but branches are now
+  coded explicitly)
+- waitaminit: how can you translate back from SSA by omitting the index if
+  you have stuff like "A(26) := x" followed by "bcc (A(25))" or somesuch???
+  PROBABLYDONE (introduced copying and explicit phi functions where
+  necessary)
+- DEREF is inconsistently used, making coding difficult; use separate
+  LOAD and STORE expressions	DONE
+- wrong tmp1 usage in fun_0x80c3 (used before assignment)	DONE
+  (end bblock when encountering statements already processed)
+- code proper function headers (no whatever and something)	DONE
+- order function parameters (there is no implied ordering due to lack of a
+  calling convention in the machine code; it's probably best done in the
+  code generator)	DONE (in ssa, necessary to map call parameters
+  to function arguments)
+- don't code memory function parameters (as C parameters)	DONE
+- out-of-scope tmp0 in fun_0x8e6a	DONE
+- return identification may cause dead code to be eliminated, which in turn
+  may cause input parameters to change; need to revisit args and all calls
+  to the function; see IDENTIRET 1037	WORKAROUND (we had to ignore returns
+  that don't have a dessa_name because of this, and that seems to do the job
+  just fine for now)
+- implement barriers (SEI/CLI, for instance, gets DCEd ATM) <- do it
+  as an impure statement and introduce an intrinsic expression	DONE
+- do condition negation when coding IT(E)	DONE (only IT, the other
+  one is already done by ordering the blocks accordingly)
+- pretested loop (example: f7c5 in f694) (tricky: the loop header is more
+  than just a branch, it does other things, too, and that's not how a
+  for(;;) loop in C works; it could be done as a while() loop with comma
+  operator, but I'm not sure if that is really useful...)	DONE
+- inconsistent return types for fun_0xf3a9	DONE
+- declare local (register) variables	DONE
+- declare memory variables as extern	DONE
+- implement one-shot comments for demo purposes DONE
+- translate indirect jump to something other than an endless loop so it can
+  be properly commented on	DONE
+- implement expression coding	DONE
+- dessa bug: if an old value does not reach the bblock to begin with, it is
+  pointless to copy it; see 0xf377	DONE
+- don't (re)declare function arguments	DONE
+- why does fun_0xf8f4 have three identical parameters?	INVALID (seems to
+  have fixed itself, and I cannot find a commit in which it is broken)
+- structure post loop bas8018/bas801f	DONE
+- make the debug output optional	DONE
+- declare arrays	DONE
+- code: clean up duplicate code that checks if code or a goto should be
+  emitted	DONE
+- simplify '1 >> 1' (bas8e5e)	DONE
+- comment deficiencies verbosely:	DONE
+  - rotate		DONE
+  - IOity of indirect accesses	DONE
+  - indirect jumps	DONE
+  - array sizes		DONE
+  - zero-page globals	DONE
+- comment the recursion shortcut	DONE
+- modifies/modified comments should be shortened if too long	DONE
+- stack at 0 or below should not reach (e.g. BCity start_d400)	DONE
+- simplify constant comparisions (14 != 8 in SMB)	DONE
+- don't declare memory that is implicitly used by calls (BCity:fun_c41d)
+  DONE
+- BCity:fun_e409 has undeclared array	DONE
+- looks like wrong propagation in rotate in Bcity:fun_d689	INVALID
+  (nope, that's reading the controller shift register)
+- uses/modifies comments are distracting, only put them at function
+  definitions	DONE (relegated to debug level 2)
+- comment on symbolic I/O addresses	DONE (added to general MMIO comment)
+- RAW in BCity:fun_d9be	DONE
+- RAW in BCity:fun_c5b0	DONE
+- advifthenF349: eliminate if(1)	DONE (actually was an if(0))
+- fun_0xf3a9 has extraneous return (n) which isn't used anywhere	DONE
+  (probably fixed in b1a711b)
+- don't declare locals that are defined by a function call, but not used or
+  returned	DONE (7642846)
+- implement remaining opcodes:	DONE!!!
+  00 BRK	DONE
+  01 ORA izx	DONE
+  0d ORA abs	DONE
+  0e ASL abs	DONE
+  16 ASL zpx	DONE
+  19 ORA aby	DONE
+  1e ASL abx	DONE
+  21 AND izx	DONE
+  24 BIT zp	DONE
+  26 ROL zp	DONE
+  2d AND abs	DONE
+  2e ROL abs	DONE
+  35 AND zpx	DONE
+  36 ROL zpx	DONE
+  39 AND aby	DONE
+  41 EOR izx	DONE
+  4d EOR abs	DONE
+  4e LSR abs	DONE
+  50 BVC	DONE
+  51 EOR izy	DONE
+  55 EOR zpx	DONE
+  56 LSR zpx	DONE
+  59 EOR aby	DONE
+  5d EOR abx	DONE
+  5e LSR abx	DONE
+  61 ADC izx	DONE
+  6e ROR abs	DONE
+  71 ADC izy	DONE
+  76 ROR zpx	DONE
+  7d ADC abx	DONE
+  81 STA izx	DONE
+  94 STY zpx	DONE
+  96 STX zpy	DONE
+  a1 LDA izx	DONE
+  b6 LDX zpy	DONE
+  b8 CLV	DONE
+  ba TSX	DONE
+  c1 CMP izx	DONE
+  c4 CPY zp	DONE
+  cd CMP abs	DONE
+  d1 CMP izy	DONE
+  d5 CMP zpx	DONE
+  d9 CMP aby	DONE
+  e1 SBC izx	DONE
+  f1 SBC izy	DONE
+  f8 SED	DONE
+- RAW in MBuggy:fun_55a7	DONE
+- simplify !((mem_0008 & 12) != 0) (BCity fun_c41d)	DONE
+- sometimes conditions cannot be simplified because complex expressions
+  are not propagated (e.g. maskrom 0x80b4)	DONE
+- sort stack arguments in function headers	DONE
+- ARM: make sure all stack-relative accesses are SSA'd as such (search
+  for "r13" in output)	DONE
+- make stack pointer copying an expression, not a definition	DONE
+  - allows simplification in expr
+  - objects can be determined on recovery
+  - base/frame pointer tracking can be done by looking at sp
+    writes only
+- too many address operators! (see maskrom fun_c800) DONE (I think...)
+- simplify off-by-one comparisons that are often the result of the
+  loop-crement simplification	DONE (not 100% safe though...)
+- do the test-after-update loop simplification also if the test is a
+  bit further down the line (see maskrom fun_8720)	DONE
+- simplify expressions containing program counter (search for "r15") DONE (I
+  think)
