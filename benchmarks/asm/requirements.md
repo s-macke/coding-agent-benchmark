@@ -4,6 +4,99 @@
 
 A MOS6502 assembler written in Golang that parses assembly source files and outputs machine code in JSON format.
 
+## API
+
+The assembler is implemented as a separate Go package `asm` with a public function:
+
+```go
+func Assemble(source string) (*AssemblerOutput, error)
+```
+
+### AssemblerOutput
+
+```go
+type AssemblerOutput struct {
+    Symbols      map[string]Symbol `json:"symbols"`
+    Instructions []Instruction     `json:"instructions"`
+}
+
+type Symbol struct {
+    Value int    `json:"value"`
+    Type  string `json:"type"`
+}
+
+type Instruction struct {
+    Address string `json:"address"`
+    Disasm  string `json:"disasm"`
+    Bytes   []int  `json:"bytes"`
+}
+```
+
+#### Symbol Fields
+
+| Field   | Description                                                                  |
+|---------|------------------------------------------------------------------------------|
+| `value` | Numeric value of the symbol                                                  |
+| `type`  | Symbol type: `"constant"` (defined with `=`) or `"label"` (defined with `:`) |
+
+#### Instruction Fields
+
+| Field     | Description                                      |
+|-----------|--------------------------------------------------|
+| `address` | Memory address in hex format (e.g., "0x8000")    |
+| `disasm`  | Human-readable disassembly (mnemonic + operand)  |
+| `bytes`   | Machine code bytes (opcode followed by operands) |
+
+#### Example Output
+
+```json
+{
+  "symbols": {
+    "SCREEN": {
+      "value": 1024,
+      "type": "constant"
+    },
+    "ptr": {
+      "value": 251,
+      "type": "constant"
+    },
+    "start": {
+      "value": 32768,
+      "type": "label"
+    },
+    "loop": {
+      "value": 32770,
+      "type": "label"
+    }
+  },
+  "instructions": [
+    {
+      "address": "0x8000",
+      "disasm": "LDA #66",
+      "bytes": [169, 66]
+    },
+    {
+      "address": "0x8002",
+      "disasm": "STA $0",
+      "bytes": [133, 0]
+    }
+  ]
+}
+```
+
+### AssemblerError
+
+The assembler uses a custom error type that includes the line number:
+
+```go
+type AssemblerError struct {
+    Line    int
+    Message string
+}
+
+func (e *AssemblerError) Error() string
+```
+
 ## Usage
 
 ```
@@ -58,62 +151,6 @@ asm [-debug] <filename.asm>
 | Indexed Indirect | `($XX,X)` | 2    | `lda ($40,x)` |
 | Indirect Indexed | `($XX),Y` | 2    | `sta (ptr),y` |
 | Relative         | `label`   | 2    | `bne loop`    |
-
-## Output Format
-
-JSON object containing symbol table and assembled instructions:
-
-```json
-{
-  "symbols": {
-    "SCREEN": {
-      "value": 1024,
-      "type": "constant"
-    },
-    "ptr": {
-      "value": 251,
-      "type": "constant"
-    },
-    "start": {
-      "value": 32768,
-      "type": "label"
-    },
-    "loop": {
-      "value": 32770,
-      "type": "label"
-    }
-  },
-  "instructions": [
-    {
-      "Address": "0x8000",
-      "Opcode": "0xA9",
-      "Value": 66
-    },
-    {
-      "Address": "0x8002",
-      "Opcode": "0x85",
-      "Value": 0
-    }
-  ]
-}
-```
-
-### Symbol Table
-
-| Field   | Description                                                                  |
-|---------|------------------------------------------------------------------------------|
-| `value` | Numeric value of the symbol                                                  |
-| `type`  | Symbol type: `"constant"` (defined with `=`) or `"label"` (defined with `:`) |
-
-### Instructions
-
-| Field     | Description                                                      |
-|-----------|------------------------------------------------------------------|
-| `Address` | Memory address of instruction (hex string)                       |
-| `Opcode`  | Instruction opcode byte (hex string)                             |
-| `Value`   | Operand value as integer (omitted for implied/accumulator modes) |
-
-Note: `Value` is an integer to support signed relative branch offsets (-128 to 127).
 
 ## Dependencies
 
