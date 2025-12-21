@@ -3,6 +3,8 @@
 ## Overview
 
 A MOS6502 assembler written in Golang that parses assembly source files and outputs machine code in JSON format.
+* Implements a CLI which outputs the JSON format.
+* Implements a separate Go package with the assembler code.
 
 ## API
 
@@ -98,6 +100,8 @@ func (e *AssemblerError) Error() string
 ```
 
 ## Usage
+
+The assembler comes with a CLI which outputs the JSON.
 
 ```
 asm [-debug] <filename.asm>
