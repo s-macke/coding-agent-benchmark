@@ -12,6 +12,7 @@ Currently, the evaluation is done manually.
 4. [MOS6502 Assembler Parser](#4-mos6502-assembler-parser)
 5. [Port Python Decompiler to Go](#5-port-python-decompiler-to-go)
 6. [Reverse Engineer Obfuscated Code](#6-reverse-engineer-obfuscated-code)
+7. [Migrate FFmpeg Library](#7-migrate-ffmpeg-library)
 
 ---
 
@@ -178,3 +179,25 @@ A compiled binary `a` is included for reference.
 - How many iterations does the agent need to fully unobfuscate?
 - Does the agent follow the embedded clues?
 - Is the final `main.c` readable and well-documented?
+
+---
+
+## 7. Migrate FFmpeg Library
+
+Tests the agent's ability to migrate a Go project from a deprecated library to a modern replacement with different APIs.
+
+- **Folder:** `newlib`
+- **Mode:** Agent
+- **Prompt:** `Migrate main.go from the deprecated goav library to go-astiav. Test with sample.mp4.`
+
+**Context:** The code is an ASCII cinema server that decodes video files using FFmpeg (via Go bindings) and converts frames to colored ASCII art. It serves the stream over HTTP (port 12345) and TCP (port 8081), playing videos in an endless loop.
+
+The current implementation uses `github.com/giorgisio/goav`, which is outdated. It must be migrated to `github.com/asticode/go-astiav`.
+
+### Evaluate
+
+- Does the migrated code compile and run?
+- Does the ASCII video stream display correctly in a terminal?
+- Does the agent consult the go-astiav documentation or examples?
+- Does the agent preserve all functionality (HTTP/TCP serving, color output, looping)?
+- Does the agent test with the provided sample video?
