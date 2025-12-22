@@ -158,7 +158,11 @@ asm [-debug] <filename.asm>
 
 ## Dependencies
 
-- `opcodes.go` - Opcode definitions, addressing modes, instruction metadata
+- `opcodes.go` - Opcode definitions, addressing modes, instruction metadata, find opcodes
+
+## Style
+
+- Separate lexer, passes, expr evaluation, symbol handling, into separate Go files. 
 
 ## Testing
 

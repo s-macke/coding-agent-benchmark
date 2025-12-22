@@ -3,7 +3,10 @@
 
 package asm
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // AddrMode represents a 6502 addressing mode.
 type AddrMode int
@@ -532,11 +535,13 @@ var Opcodes = [256]OpcodeDef{
 	0xFF: {0xFF, MnemonicIllegal, AddrImplied, 1, 0, false},
 }
 
-// FindOpcode finds an opcode by mnemonic and addressing mode.
-// Returns the opcode byte and true if found, or 0 and false if not found.
-func FindOpcode(op Mnemonic, mode AddrMode) (*OpcodeDef, bool) {
+// FindOpcode finds an opcode by mnemonic string and addressing mode.
+// The mnemonic string is case insensitive.
+// Returns the opcode definition and true if found, or nil and false if not found.
+func FindOpcode(mnemonic string, mode AddrMode) (*OpcodeDef, bool) {
+	upper := strings.ToUpper(mnemonic)
 	for i := 0; i < 256; i++ {
-		if Opcodes[i].Op == op && Opcodes[i].Mode == mode {
+		if Opcodes[i].Op.String() == upper && Opcodes[i].Mode == mode {
 			return &Opcodes[i], true
 		}
 	}
