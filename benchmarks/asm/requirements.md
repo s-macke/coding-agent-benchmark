@@ -162,7 +162,7 @@ asm [-debug] <filename.asm>
 
 ## Style
 
-- Separate lexer, passes, expr evaluation, symbol handling, into separate Go files. 
+- Separate lexer, passes, expr evaluation, symbol handling, error type, into separate Go files. 
 
 ## Testing
 
