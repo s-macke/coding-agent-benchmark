@@ -162,4 +162,4 @@ asm [-debug] <filename.asm>
 
 ## Testing
 
-Test the implementation against all files in the "examples" directory.
+Test the implementation against all files in the "examples" and "examples_invalid" directory.
