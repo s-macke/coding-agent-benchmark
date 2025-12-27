@@ -201,3 +201,36 @@ The current implementation uses `github.com/giorgisio/goav`, which is outdated. 
 - Does the agent consult the go-astiav documentation or examples?
 - Does the agent preserve all functionality (HTTP/TCP serving, color output, looping)?
 - Does the agent test with the provided sample video?
+
+## 8. Write decode for an unknown encode function.
+
+Test the capability to analyze a difficult encoding/compression format.
+Compile encode.go in the utils and put it into the encode directory.
+
+- **Folder:** `newlib`
+- **Mode:** Agent
+  **Prompt:** `The Encode CLI program provides a file encoding algorithm. Analyze the output of the encoding function and determine the algorithm. Write a spec.md file with the used algorithm.`
+
+### Evaluate
+
+- Does the agent recognizes the huffman encoding in the error message?
+- Does the agent recognizes the bit encoding format?
+
+
+## 9. Port of old Adventure Game
+- **Folder:** `gameport`
+- **Mode:** Agent
+- **Prompts:**
+  1. `Detokenize the basic code and write the result into .bas files`
+  2. `What does the basic file reveal about the binary world file? Write the result a into spec.md file`
+  3. `Extract the world map and show the map as a png file`
+  4. `Can you use the correct tile pixel information for the image?`
+
+## 10. Port of old Strategy game
+- **Folder:** `gameport`
+- **Mode:** Agent
+- **Prompts:**
+  1. `Analyze weltendaemmerung.bin and write the results into spec.md`
+  2. `Disassemble the file using disasm6502.py`
+  3. `Extract the map with tiles and store into a png image`
+  4. `Extract the stats of the units`
