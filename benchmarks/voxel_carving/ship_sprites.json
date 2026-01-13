@@ -5,12 +5,12 @@
       "row": null,
       "yaw": 0,
       "pitch": 90,
-      "type": "bottom",
       "width": 116,
       "height": 72,
       "x": -56,
       "y": -34,
-      "filename": "SHIP_block00_sub00_w116_h72_x-56_y-34.png"
+      "filename": "SHIP_block00_sub00_w116_h72_x-56_y-34.png",
+      "type": "bottom"
     },
     {
       "block": 1,
@@ -92,7 +92,7 @@
     {
       "block": 8,
       "row": 1,
-      "yaw": 180,
+      "yaw": 0,
       "pitch": 30,
       "width": 87,
       "height": 76,
@@ -103,7 +103,7 @@
     {
       "block": 9,
       "row": 1,
-      "yaw": 150,
+      "yaw": 30,
       "pitch": 30,
       "width": 86,
       "height": 73,
@@ -114,7 +114,7 @@
     {
       "block": 10,
       "row": 1,
-      "yaw": 120,
+      "yaw": 60,
       "pitch": 30,
       "width": 111,
       "height": 58,
@@ -136,7 +136,7 @@
     {
       "block": 12,
       "row": 1,
-      "yaw": 60,
+      "yaw": 120,
       "pitch": 30,
       "width": 104,
       "height": 57,
@@ -147,7 +147,7 @@
     {
       "block": 13,
       "row": 1,
-      "yaw": 30,
+      "yaw": 150,
       "pitch": 30,
       "width": 82,
       "height": 65,
@@ -158,7 +158,7 @@
     {
       "block": 14,
       "row": 1,
-      "yaw": 0,
+      "yaw": 180,
       "pitch": 30,
       "width": 83,
       "height": 64,
@@ -175,7 +175,8 @@
       "height": 46,
       "x": -39,
       "y": -21,
-      "filename": "SHIP_block15_sub00_w80_h46_x-39_y-21.png"
+      "filename": "SHIP_block15_sub00_w80_h46_x-39_y-21.png",
+      "type": "front"
     },
     {
       "block": 16,
@@ -246,7 +247,7 @@
     {
       "block": 22,
       "row": 3,
-      "yaw": 180,
+      "yaw": 0,
       "pitch": -30,
       "width": 84,
       "height": 58,
@@ -257,7 +258,7 @@
     {
       "block": 23,
       "row": 3,
-      "yaw": 150,
+      "yaw": 30,
       "pitch": -30,
       "width": 86,
       "height": 61,
@@ -268,7 +269,7 @@
     {
       "block": 24,
       "row": 3,
-      "yaw": 120,
+      "yaw": 60,
       "pitch": -30,
       "width": 117,
       "height": 60,
@@ -290,7 +291,7 @@
     {
       "block": 26,
       "row": 3,
-      "yaw": 60,
+      "yaw": 120,
       "pitch": -30,
       "width": 107,
       "height": 59,
@@ -301,7 +302,7 @@
     {
       "block": 27,
       "row": 3,
-      "yaw": 30,
+      "yaw": 150,
       "pitch": -30,
       "width": 79,
       "height": 66,
@@ -312,7 +313,7 @@
     {
       "block": 28,
       "row": 3,
-      "yaw": 0,
+      "yaw": 180,
       "pitch": -30,
       "width": 79,
       "height": 67,
@@ -402,12 +403,12 @@
       "row": null,
       "yaw": 0,
       "pitch": -90,
-      "type": "top",
       "width": 127,
       "height": 66,
       "x": -61,
       "y": -31,
-      "filename": "SHIP_block36_sub00_w127_h66_x-61_y-31.png"
+      "filename": "SHIP_block36_sub00_w127_h66_x-61_y-31.png",
+      "type": "top"
     }
   ]
 }
