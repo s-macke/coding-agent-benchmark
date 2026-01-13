@@ -10,7 +10,17 @@
       "x": -56,
       "y": -34,
       "filename": "SHIP_block00_sub00_w116_h72_x-56_y-34.png",
-      "type": "bottom"
+      "type": "bottom",
+      "camera_up": [
+        0,
+        -1,
+        0
+      ],
+      "camera_right": [
+        1,
+        0,
+        0
+      ]
     },
     {
       "block": 1,
@@ -21,7 +31,17 @@
       "height": 90,
       "x": -41,
       "y": -51,
-      "filename": "SHIP_block01_sub00_w84_h90_x-41_y-51.png"
+      "filename": "SHIP_block01_sub00_w84_h90_x-41_y-51.png",
+      "camera_up": [
+        -0.866025,
+        -0.0,
+        0.5
+      ],
+      "camera_right": [
+        -0.0,
+        1.0,
+        0.0
+      ]
     },
     {
       "block": 2,
@@ -32,7 +52,17 @@
       "height": 88,
       "x": -37,
       "y": -49,
-      "filename": "SHIP_block02_sub00_w83_h88_x-37_y-49.png"
+      "filename": "SHIP_block02_sub00_w83_h88_x-37_y-49.png",
+      "camera_up": [
+        -0.75,
+        -0.433013,
+        0.5
+      ],
+      "camera_right": [
+        -0.5,
+        0.866025,
+        0.0
+      ]
     },
     {
       "block": 3,
@@ -43,7 +73,17 @@
       "height": 72,
       "x": -50,
       "y": -33,
-      "filename": "SHIP_block03_sub00_w101_h72_x-50_y-33.png"
+      "filename": "SHIP_block03_sub00_w101_h72_x-50_y-33.png",
+      "camera_up": [
+        -0.433013,
+        -0.75,
+        0.5
+      ],
+      "camera_right": [
+        -0.866025,
+        0.5,
+        0.0
+      ]
     },
     {
       "block": 4,
@@ -54,7 +94,17 @@
       "height": 64,
       "x": -57,
       "y": -27,
-      "filename": "SHIP_block04_sub00_w118_h64_x-57_y-27.png"
+      "filename": "SHIP_block04_sub00_w118_h64_x-57_y-27.png",
+      "camera_up": [
+        0.0,
+        -0.866025,
+        0.5
+      ],
+      "camera_right": [
+        -1.0,
+        -0.0,
+        0.0
+      ]
     },
     {
       "block": 5,
@@ -65,7 +115,17 @@
       "height": 67,
       "x": -50,
       "y": -33,
-      "filename": "SHIP_block05_sub00_w110_h67_x-50_y-33.png"
+      "filename": "SHIP_block05_sub00_w110_h67_x-50_y-33.png",
+      "camera_up": [
+        0.433013,
+        -0.75,
+        0.5
+      ],
+      "camera_right": [
+        -0.866025,
+        -0.5,
+        0.0
+      ]
     },
     {
       "block": 6,
@@ -76,7 +136,17 @@
       "height": 84,
       "x": -37,
       "y": -49,
-      "filename": "SHIP_block06_sub00_w86_h84_x-37_y-49.png"
+      "filename": "SHIP_block06_sub00_w86_h84_x-37_y-49.png",
+      "camera_up": [
+        0.75,
+        -0.433013,
+        0.5
+      ],
+      "camera_right": [
+        -0.5,
+        -0.866025,
+        0.0
+      ]
     },
     {
       "block": 7,
@@ -87,7 +157,17 @@
       "height": 91,
       "x": -42,
       "y": -53,
-      "filename": "SHIP_block07_sub00_w86_h91_x-42_y-53.png"
+      "filename": "SHIP_block07_sub00_w86_h91_x-42_y-53.png",
+      "camera_up": [
+        0.866025,
+        0.0,
+        0.5
+      ],
+      "camera_right": [
+        0.0,
+        -1.0,
+        0.0
+      ]
     },
     {
       "block": 8,
@@ -98,7 +178,17 @@
       "height": 76,
       "x": -42,
       "y": -44,
-      "filename": "SHIP_block08_sub00_w87_h76_x-42_y-44.png"
+      "filename": "SHIP_block08_sub00_w87_h76_x-42_y-44.png",
+      "camera_up": [
+        0.5,
+        0.0,
+        0.866025
+      ],
+      "camera_right": [
+        0.0,
+        -1.0,
+        0.0
+      ]
     },
     {
       "block": 9,
@@ -109,7 +199,17 @@
       "height": 73,
       "x": -38,
       "y": -42,
-      "filename": "SHIP_block09_sub00_w86_h73_x-38_y-42.png"
+      "filename": "SHIP_block09_sub00_w86_h73_x-38_y-42.png",
+      "camera_up": [
+        0.433013,
+        -0.25,
+        0.866025
+      ],
+      "camera_right": [
+        -0.5,
+        -0.866025,
+        0.0
+      ]
     },
     {
       "block": 10,
@@ -120,7 +220,17 @@
       "height": 58,
       "x": -49,
       "y": -31,
-      "filename": "SHIP_block10_sub00_w111_h58_x-49_y-31.png"
+      "filename": "SHIP_block10_sub00_w111_h58_x-49_y-31.png",
+      "camera_up": [
+        0.25,
+        -0.433013,
+        0.866025
+      ],
+      "camera_right": [
+        -0.866025,
+        -0.5,
+        0.0
+      ]
     },
     {
       "block": 11,
@@ -131,7 +241,17 @@
       "height": 50,
       "x": -59,
       "y": -22,
-      "filename": "SHIP_block11_sub00_w121_h50_x-59_y-22.png"
+      "filename": "SHIP_block11_sub00_w121_h50_x-59_y-22.png",
+      "camera_up": [
+        0.0,
+        -0.5,
+        0.866025
+      ],
+      "camera_right": [
+        -1.0,
+        -0.0,
+        0.0
+      ]
     },
     {
       "block": 12,
@@ -142,7 +262,17 @@
       "height": 57,
       "x": -54,
       "y": -27,
-      "filename": "SHIP_block12_sub00_w104_h57_x-54_y-27.png"
+      "filename": "SHIP_block12_sub00_w104_h57_x-54_y-27.png",
+      "camera_up": [
+        -0.25,
+        -0.433013,
+        0.866025
+      ],
+      "camera_right": [
+        -0.866025,
+        0.5,
+        0.0
+      ]
     },
     {
       "block": 13,
@@ -153,7 +283,17 @@
       "height": 65,
       "x": -36,
       "y": -38,
-      "filename": "SHIP_block13_sub00_w82_h65_x-36_y-38.png"
+      "filename": "SHIP_block13_sub00_w82_h65_x-36_y-38.png",
+      "camera_up": [
+        -0.433013,
+        -0.25,
+        0.866025
+      ],
+      "camera_right": [
+        -0.5,
+        0.866025,
+        0.0
+      ]
     },
     {
       "block": 14,
@@ -164,7 +304,17 @@
       "height": 64,
       "x": -40,
       "y": -40,
-      "filename": "SHIP_block14_sub00_w83_h64_x-40_y-40.png"
+      "filename": "SHIP_block14_sub00_w83_h64_x-40_y-40.png",
+      "camera_up": [
+        -0.5,
+        -0.0,
+        0.866025
+      ],
+      "camera_right": [
+        -0.0,
+        1.0,
+        0.0
+      ]
     },
     {
       "block": 15,
@@ -176,7 +326,17 @@
       "x": -39,
       "y": -21,
       "filename": "SHIP_block15_sub00_w80_h46_x-39_y-21.png",
-      "type": "front"
+      "type": "front",
+      "camera_up": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "camera_right": [
+        -0.0,
+        1.0,
+        0.0
+      ]
     },
     {
       "block": 16,
@@ -187,7 +347,17 @@
       "height": 46,
       "x": -35,
       "y": -21,
-      "filename": "SHIP_block16_sub00_w80_h46_x-35_y-21.png"
+      "filename": "SHIP_block16_sub00_w80_h46_x-35_y-21.png",
+      "camera_up": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "camera_right": [
+        -0.5,
+        0.866025,
+        0.0
+      ]
     },
     {
       "block": 17,
@@ -198,7 +368,17 @@
       "height": 44,
       "x": -56,
       "y": -20,
-      "filename": "SHIP_block17_sub00_w105_h44_x-56_y-20.png"
+      "filename": "SHIP_block17_sub00_w105_h44_x-56_y-20.png",
+      "camera_up": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "camera_right": [
+        -0.866025,
+        0.5,
+        0.0
+      ]
     },
     {
       "block": 18,
@@ -209,7 +389,17 @@
       "height": 41,
       "x": -60,
       "y": -19,
-      "filename": "SHIP_block18_sub00_w123_h41_x-60_y-19.png"
+      "filename": "SHIP_block18_sub00_w123_h41_x-60_y-19.png",
+      "camera_up": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "camera_right": [
+        -1.0,
+        -0.0,
+        0.0
+      ]
     },
     {
       "block": 19,
@@ -220,7 +410,17 @@
       "height": 40,
       "x": -49,
       "y": -19,
-      "filename": "SHIP_block19_sub00_w113_h40_x-49_y-19.png"
+      "filename": "SHIP_block19_sub00_w113_h40_x-49_y-19.png",
+      "camera_up": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "camera_right": [
+        -0.866025,
+        -0.5,
+        0.0
+      ]
     },
     {
       "block": 20,
@@ -231,7 +431,17 @@
       "height": 41,
       "x": -37,
       "y": -20,
-      "filename": "SHIP_block20_sub00_w87_h41_x-37_y-20.png"
+      "filename": "SHIP_block20_sub00_w87_h41_x-37_y-20.png",
+      "camera_up": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "camera_right": [
+        -0.5,
+        -0.866025,
+        0.0
+      ]
     },
     {
       "block": 21,
@@ -242,7 +452,17 @@
       "height": 40,
       "x": -42,
       "y": -20,
-      "filename": "SHIP_block21_sub00_w86_h40_x-42_y-20.png"
+      "filename": "SHIP_block21_sub00_w86_h40_x-42_y-20.png",
+      "camera_up": [
+        -0.0,
+        0.0,
+        1.0
+      ],
+      "camera_right": [
+        0.0,
+        -1.0,
+        0.0
+      ]
     },
     {
       "block": 22,
@@ -253,7 +473,17 @@
       "height": 58,
       "x": -41,
       "y": -27,
-      "filename": "SHIP_block22_sub00_w84_h58_x-41_y-27.png"
+      "filename": "SHIP_block22_sub00_w84_h58_x-41_y-27.png",
+      "camera_up": [
+        -0.5,
+        0.0,
+        0.866025
+      ],
+      "camera_right": [
+        0.0,
+        -1.0,
+        0.0
+      ]
     },
     {
       "block": 23,
@@ -264,7 +494,17 @@
       "height": 61,
       "x": -36,
       "y": -27,
-      "filename": "SHIP_block23_sub00_w86_h61_x-36_y-27.png"
+      "filename": "SHIP_block23_sub00_w86_h61_x-36_y-27.png",
+      "camera_up": [
+        -0.433013,
+        0.25,
+        0.866025
+      ],
+      "camera_right": [
+        -0.5,
+        -0.866025,
+        0.0
+      ]
     },
     {
       "block": 24,
@@ -275,7 +515,17 @@
       "height": 60,
       "x": -51,
       "y": -24,
-      "filename": "SHIP_block24_sub00_w117_h60_x-51_y-24.png"
+      "filename": "SHIP_block24_sub00_w117_h60_x-51_y-24.png",
+      "camera_up": [
+        -0.25,
+        0.433013,
+        0.866025
+      ],
+      "camera_right": [
+        -0.866025,
+        -0.5,
+        0.0
+      ]
     },
     {
       "block": 25,
@@ -286,7 +536,17 @@
       "height": 54,
       "x": -61,
       "y": -21,
-      "filename": "SHIP_block25_sub00_w125_h54_x-61_y-21.png"
+      "filename": "SHIP_block25_sub00_w125_h54_x-61_y-21.png",
+      "camera_up": [
+        -0.0,
+        0.5,
+        0.866025
+      ],
+      "camera_right": [
+        -1.0,
+        -0.0,
+        0.0
+      ]
     },
     {
       "block": 26,
@@ -297,7 +557,17 @@
       "height": 59,
       "x": -56,
       "y": -28,
-      "filename": "SHIP_block26_sub00_w107_h59_x-56_y-28.png"
+      "filename": "SHIP_block26_sub00_w107_h59_x-56_y-28.png",
+      "camera_up": [
+        0.25,
+        0.433013,
+        0.866025
+      ],
+      "camera_right": [
+        -0.866025,
+        0.5,
+        0.0
+      ]
     },
     {
       "block": 27,
@@ -308,7 +578,17 @@
       "height": 66,
       "x": -35,
       "y": -30,
-      "filename": "SHIP_block27_sub00_w79_h66_x-35_y-30.png"
+      "filename": "SHIP_block27_sub00_w79_h66_x-35_y-30.png",
+      "camera_up": [
+        0.433013,
+        0.25,
+        0.866025
+      ],
+      "camera_right": [
+        -0.5,
+        0.866025,
+        0.0
+      ]
     },
     {
       "block": 28,
@@ -319,7 +599,17 @@
       "height": 67,
       "x": -38,
       "y": -30,
-      "filename": "SHIP_block28_sub00_w79_h67_x-38_y-30.png"
+      "filename": "SHIP_block28_sub00_w79_h67_x-38_y-30.png",
+      "camera_up": [
+        0.5,
+        0.0,
+        0.866025
+      ],
+      "camera_right": [
+        -0.0,
+        1.0,
+        0.0
+      ]
     },
     {
       "block": 29,
@@ -330,7 +620,17 @@
       "height": 96,
       "x": -37,
       "y": -46,
-      "filename": "SHIP_block29_sub00_w77_h96_x-37_y-46.png"
+      "filename": "SHIP_block29_sub00_w77_h96_x-37_y-46.png",
+      "camera_up": [
+        0.866025,
+        0.0,
+        0.5
+      ],
+      "camera_right": [
+        -0.0,
+        1.0,
+        0.0
+      ]
     },
     {
       "block": 30,
@@ -341,7 +641,17 @@
       "height": 93,
       "x": -35,
       "y": -46,
-      "filename": "SHIP_block30_sub00_w78_h93_x-35_y-46.png"
+      "filename": "SHIP_block30_sub00_w78_h93_x-35_y-46.png",
+      "camera_up": [
+        0.75,
+        0.433013,
+        0.5
+      ],
+      "camera_right": [
+        -0.5,
+        0.866025,
+        0.0
+      ]
     },
     {
       "block": 31,
@@ -352,7 +662,17 @@
       "height": 71,
       "x": -54,
       "y": -37,
-      "filename": "SHIP_block31_sub00_w109_h71_x-54_y-37.png"
+      "filename": "SHIP_block31_sub00_w109_h71_x-54_y-37.png",
+      "camera_up": [
+        0.433013,
+        0.75,
+        0.5
+      ],
+      "camera_right": [
+        -0.866025,
+        0.5,
+        0.0
+      ]
     },
     {
       "block": 32,
@@ -363,7 +683,17 @@
       "height": 61,
       "x": -61,
       "y": -23,
-      "filename": "SHIP_block32_sub00_w127_h61_x-61_y-23.png"
+      "filename": "SHIP_block32_sub00_w127_h61_x-61_y-23.png",
+      "camera_up": [
+        -0.0,
+        0.866025,
+        0.5
+      ],
+      "camera_right": [
+        -1.0,
+        -0.0,
+        0.0
+      ]
     },
     {
       "block": 33,
@@ -374,7 +704,17 @@
       "height": 70,
       "x": -53,
       "y": -28,
-      "filename": "SHIP_block33_sub00_w118_h70_x-53_y-28.png"
+      "filename": "SHIP_block33_sub00_w118_h70_x-53_y-28.png",
+      "camera_up": [
+        -0.433013,
+        0.75,
+        0.5
+      ],
+      "camera_right": [
+        -0.866025,
+        -0.5,
+        0.0
+      ]
     },
     {
       "block": 34,
@@ -385,7 +725,17 @@
       "height": 85,
       "x": -36,
       "y": -38,
-      "filename": "SHIP_block34_sub00_w84_h85_x-36_y-38.png"
+      "filename": "SHIP_block34_sub00_w84_h85_x-36_y-38.png",
+      "camera_up": [
+        -0.75,
+        0.433013,
+        0.5
+      ],
+      "camera_right": [
+        -0.5,
+        -0.866025,
+        0.0
+      ]
     },
     {
       "block": 35,
@@ -396,7 +746,17 @@
       "height": 95,
       "x": -38,
       "y": -44,
-      "filename": "SHIP_block35_sub00_w79_h95_x-38_y-44.png"
+      "filename": "SHIP_block35_sub00_w79_h95_x-38_y-44.png",
+      "camera_up": [
+        -0.866025,
+        0.0,
+        0.5
+      ],
+      "camera_right": [
+        0.0,
+        -1.0,
+        0.0
+      ]
     },
     {
       "block": 36,
@@ -408,7 +768,17 @@
       "x": -61,
       "y": -31,
       "filename": "SHIP_block36_sub00_w127_h66_x-61_y-31.png",
-      "type": "top"
+      "type": "top",
+      "camera_up": [
+        0,
+        1,
+        0
+      ],
+      "camera_right": [
+        -1,
+        0,
+        0
+      ]
     }
   ]
 }

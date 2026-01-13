@@ -147,61 +147,133 @@ Special blocks:
 
 ---
 
-## Camera Vector Calculation
+## Camera Setup Pseudocode
 
-The coordinate system uses Z as the vertical axis:
-- **X** = right
-- **Y** = front (ship nose points toward -Y)
-- **Z** = up
+The camera is positioned on a sphere around the ship, always looking at the origin (ship center).
 
-### Camera Position from Yaw/Pitch
+### Coordinate System
 
 ```
-function get_camera_position(yaw, pitch, radius):
-    // Convert degrees to radians
-    yaw_rad = radians(yaw)
-    pitch_rad = radians(pitch)
+Ship orientation:
+- Nose points along +X axis
+- Right wing points along +Y axis
+- Top of ship points along +Z axis
 
-    // Camera position in spherical coordinates
-    // Yaw rotates around Z axis, Pitch tilts up/down
-    cam_x = radius * cos(pitch_rad) * sin(yaw_rad)
-    cam_y = radius * cos(pitch_rad) * cos(yaw_rad)
-    cam_z = -radius * sin(pitch_rad)
-
-    return (cam_x, cam_y, cam_z)
+Angles:
+- YAW: 0° = rear (camera at -X), 90° = right side (camera at +Y), 180° = front (camera at +X)
+- PITCH: 90° = below (camera at -Z), 0° = level, -90° = above (camera at +Z)
 ```
 
-Yaw interpretation:
-- `yaw = 0°` → camera at +Y (rear view, sees engines)
-- `yaw = 90°` → camera at +X (right side view)
-- `yaw = 180°` → camera at -Y (front view, sees cockpit)
+### Camera Position Calculation
 
-Pitch interpretation:
-- `pitch = 90°` → camera at -Z (below, looking up at bottom)
-- `pitch = 0°` → camera in XY plane (level view)
-- `pitch = -90°` → camera at +Z (above, looking down at top)
+```python
+def get_camera_vectors(yaw_deg, pitch_deg, distance):
+    """
+    Calculate camera position and orientation vectors.
 
-### Camera Orientation Vectors
+    Returns: (camera_position, look_at, up_vector, right_vector)
+    """
+    yaw = radians(yaw_deg)
+    pitch = radians(pitch_deg)
 
-```
-function get_camera_vectors(yaw, pitch):
-    cam_pos = get_camera_position(yaw, pitch, radius)
+    # Camera position on sphere around origin
+    # At yaw=0 (rear view), camera is behind ship at -X
+    # At yaw=180 (front view), camera is in front at +X
+    cam_x = -distance * cos(yaw) * cos(pitch)
+    cam_y =  distance * sin(yaw) * cos(pitch)
+    cam_z =  distance * sin(pitch)
 
-    // Forward vector (camera looks at origin)
-    forward = normalize(-cam_pos)
+    camera_position = (cam_x, cam_y, cam_z)
+    look_at = (0, 0, 0)  # Always looking at ship center
 
-    // World up reference
-    world_up = (0, 0, 1)
+    # Forward vector (from camera toward ship)
+    forward = normalize(look_at - camera_position)
 
-    // Right vector
-    if abs(pitch) >= 89:
-        // Looking straight up/down, use yaw to determine right
-        right = (sin(yaw_rad), cos(yaw_rad), 0)
-    else:
+    # === UP AND RIGHT VECTOR CALCULATION ===
+
+    if pitch == 90:  # SPECIAL CASE: Pure bottom view (Block 0)
+        # Looking straight up at belly
+        # Ship's nose (+X) should point RIGHT on screen
+        up = (0, -1, 0)      # Camera's up points toward -Y (ship's left)
+        right = (1, 0, 0)    # Camera's right points toward +X (ship's nose)
+
+    elif pitch == -90:  # SPECIAL CASE: Pure top view (Block 36)
+        # Looking straight down at top
+        # Ship's nose (+X) should point LEFT on screen
+        up = (0, 1, 0)       # Camera's up points toward +Y (ship's right)
+        right = (-1, 0, 0)   # Camera's right points toward -X (ship's tail)
+
+    else:  # NORMAL CASE: All other views
+        # World up is +Z
+        world_up = (0, 0, 1)
+
+        # Right vector = forward × world_up (cross product)
         right = normalize(cross(forward, world_up))
 
-    // Up vector
+        # Up vector = right × forward
+        up = normalize(cross(right, forward))
+
+    return camera_position, look_at, up, right
+```
+
+### Special Cases Explained
+
+**Block 0 (Pure Bottom, pitch = 90°):**
+- Camera is directly below the ship, looking up
+- At this angle, yaw is meaningless (gimbal lock)
+- We define: ship's nose points RIGHT, ship's right wing points DOWN
+- This requires a 90° counter-clockwise roll from the default orientation
+
+**Block 36 (Pure Top, pitch = -90°):**
+- Camera is directly above the ship, looking down
+- At this angle, yaw is meaningless (gimbal lock)
+- We define: ship's nose points LEFT, ship's right wing points DOWN
+- This requires a 90° clockwise roll from the default orientation
+
+### View Matrix Construction
+
+```python
+def build_view_matrix(camera_pos, look_at, up):
+    """
+    Build a 4x4 view matrix for rendering.
+    """
+    forward = normalize(look_at - camera_pos)
+    right = normalize(cross(forward, up))
     up = cross(right, forward)
 
-    return (forward, up, right)
+    # View matrix (camera transform inverse)
+    return Matrix4x4(
+        right.x,    right.y,    right.z,    -dot(right, camera_pos),
+        up.x,       up.y,       up.z,       -dot(up, camera_pos),
+        -forward.x, -forward.y, -forward.z,  dot(forward, camera_pos),
+        0,          0,          0,           1
+    )
 ```
+
+### Rotation Angles for matplotlib/OpenGL
+
+For rendering libraries that use elevation/azimuth/roll:
+
+```python
+def get_euler_angles(yaw_deg, pitch_deg):
+    """
+    Convert Wing Commander angles to rendering library angles.
+    """
+    # Elevation (vertical angle from horizon)
+    elevation = -pitch_deg  # Invert: WC pitch 90° (below) = elevation -90°
+
+    # Azimuth (horizontal rotation)
+    azimuth = 180 - yaw_deg  # WC yaw 180° (front) = azimuth 0°
+
+    # Roll (rotation around view axis)
+    if pitch_deg == 90:      # Pure bottom
+        roll = -90           # 90° counter-clockwise
+    elif pitch_deg == -90:   # Pure top
+        roll = 90            # 90° clockwise
+    else:
+        roll = 0
+
+    return elevation, azimuth, roll
+```
+
+---
