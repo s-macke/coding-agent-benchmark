@@ -119,6 +119,14 @@ This reduces storage requirements by nearly half while maintaining full 360° ro
 
 ---
 
+## Sprite Origin (Center of Rotation)
+
+The `x` and `y` values in `ship_sprites.json` specify the center of rotation for each sprite. These are offsets from the sprite's top-left corner to the ship's center point. For example, a sprite with `x: -56, y: -34` means the ship's center is located 56 pixels to the right and 34 pixels down from the top-left corner of the sprite image.
+
+When rendering, position the sprite so that this offset point aligns with the ship's screen position. This ensures the ship rotates around its center rather than a corner.
+
+---
+
 ## Block Index Formula
 
 The sprites use a **zigzag (boustrophedon) pattern** where odd rows have reversed yaw order:
