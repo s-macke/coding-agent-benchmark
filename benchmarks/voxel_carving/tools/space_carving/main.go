@@ -34,23 +34,16 @@ func main() {
 
 	fmt.Println("Loading images and building cameras...")
 	cameras := make([]*Camera, len(sprites))
-	silhouettes := make([]*Silhouette, len(sprites))
-	spriteImages := make([]*SpriteImage, len(sprites))
+	images := make([]*SpriteImage, len(sprites))
 
 	for i, sprite := range sprites {
 		imgPath := filepath.Join(*imagesDir, sprite.Filename)
 
-		sil, err := LoadSilhouette(imgPath, *alphaThreshold)
+		img, err := LoadSpriteImage(imgPath, *alphaThreshold)
 		if err != nil {
 			fatalf("Error loading image %s: %v", imgPath, err)
 		}
-		silhouettes[i] = sil
-
-		sprImg, err := LoadSpriteImage(imgPath, *alphaThreshold)
-		if err != nil {
-			fatalf("Error loading sprite image %s: %v", imgPath, err)
-		}
-		spriteImages[i] = sprImg
+		images[i] = img
 
 		cameras[i] = NewCamera(
 			sprite.Yaw,
@@ -63,7 +56,7 @@ func main() {
 			*distance,
 		)
 	}
-	fmt.Printf("  Loaded %d images\n", len(silhouettes))
+	fmt.Printf("  Loaded %d images\n", len(images))
 
 	fmt.Printf("Creating %dx%dx%d voxel grid (extent ±%.2f)...\n",
 		*resolution, *resolution, *resolution, *extent)
@@ -71,9 +64,9 @@ func main() {
 	fmt.Printf("  Initial voxels: %d\n", grid.OccupiedCount())
 
 	fmt.Println("Carving visual hull...")
-	CarveVisualHull(grid, cameras, silhouettes, *symmetry)
+	CarveVisualHull(grid, cameras, images, *symmetry)
 
-	coloredPoints := SampleColors(grid, cameras, spriteImages, *symmetry)
+	coloredPoints := SampleColors(grid, cameras, images, *symmetry)
 
 	fmt.Printf("Exporting %d colored voxels to %s...\n", len(coloredPoints), *outputPath)
 	if *mesh {

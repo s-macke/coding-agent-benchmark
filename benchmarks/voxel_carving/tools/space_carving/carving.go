@@ -5,7 +5,7 @@ import "fmt"
 // CarveVisualHull performs space carving from multiple silhouettes.
 // For each view, voxels that project outside the silhouette are marked as empty.
 // If symmetry is true, also uses mirrored views (doubles effective views).
-func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, silhouettes []*Silhouette, symmetry bool) {
+func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, symmetry bool) {
 	numViews := len(cameras)
 	if symmetry {
 		numViews *= 2
@@ -14,18 +14,17 @@ func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, silhouettes []*Silhouet
 
 	// Carve with original views
 	for viewIdx, cam := range cameras {
-		sil := silhouettes[viewIdx]
-		carved := carveFromView(grid, cam, sil)
+		img := images[viewIdx]
+		carved := carveFromView(grid, cam, img, false)
 		fmt.Printf("  View %d: carved %d voxels\n", viewIdx, carved)
 	}
 
 	// Carve with mirrored views if symmetry enabled
 	if symmetry {
 		for viewIdx, cam := range cameras {
-			sil := silhouettes[viewIdx]
+			img := images[viewIdx]
 			mirroredCam := cam.Mirror()
-			mirroredSil := sil.MirrorHorizontal()
-			carved := carveFromView(grid, mirroredCam, mirroredSil)
+			carved := carveFromView(grid, mirroredCam, img, true)
 			fmt.Printf("  View %d (mirrored): carved %d voxels\n", viewIdx, carved)
 		}
 	}
@@ -34,8 +33,10 @@ func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, silhouettes []*Silhouet
 }
 
 // carveFromView carves voxels that don't project into a single silhouette.
-func carveFromView(grid *VoxelGrid, cam *Camera, sil *Silhouette) int {
+// If mirrorX is true, flips X coordinate to simulate mirrored image.
+func carveFromView(grid *VoxelGrid, cam *Camera, img *SpriteImage, mirrorX bool) int {
 	carved := 0
+	imgWidth := float64(img.Width() - 1)
 
 	for ix := 0; ix < grid.Resolution; ix++ {
 		for iy := 0; iy < grid.Resolution; iy++ {
@@ -47,7 +48,11 @@ func carveFromView(grid *VoxelGrid, cam *Camera, sil *Silhouette) int {
 				pos := grid.Position(ix, iy, iz)
 				projX, projY := cam.Project(pos)
 
-				if !sil.InBounds(projX, projY) || !sil.ContainsFloat(projX, projY) {
+				if mirrorX {
+					projX = imgWidth - projX
+				}
+
+				if !img.InBounds(projX, projY) || !img.ContainsFloat(projX, projY) {
 					grid.Clear(ix, iy, iz)
 					carved++
 				}
@@ -63,19 +68,20 @@ func carveFromView(grid *VoxelGrid, cam *Camera, sil *Silhouette) int {
 func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, symmetry bool) []ColoredPoint {
 	fmt.Println("Sampling colors...")
 
-	// Build list of all cameras and images (including mirrored if symmetry)
-	allCameras := make([]*Camera, 0, len(cameras)*2)
-	allImages := make([]*SpriteImage, 0, len(images)*2)
-
-	for i, cam := range cameras {
-		allCameras = append(allCameras, cam)
-		allImages = append(allImages, images[i])
+	// Build list of cameras with mirror flags
+	type viewInfo struct {
+		cam     *Camera
+		img     *SpriteImage
+		mirrorX bool
 	}
 
+	views := make([]viewInfo, 0, len(cameras)*2)
+	for i, cam := range cameras {
+		views = append(views, viewInfo{cam, images[i], false})
+	}
 	if symmetry {
 		for i, cam := range cameras {
-			allCameras = append(allCameras, cam.Mirror())
-			allImages = append(allImages, images[i].MirrorHorizontal())
+			views = append(views, viewInfo{cam.Mirror(), images[i], true})
 		}
 	}
 
@@ -89,25 +95,24 @@ func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, sym
 				}
 
 				pos := grid.Position(ix, iy, iz)
-
-				// Track color sums for averaging
 				var sumR, sumG, sumB int
 				count := 0
 
-				for i, cam := range allCameras {
-					img := allImages[i]
-					projX, projY := cam.Project(pos)
+				for _, v := range views {
+					projX, projY := v.cam.Project(pos)
+					if v.mirrorX {
+						projX = float64(v.img.Width()-1) - projX
+					}
 
-					if img.InBounds(projX, projY) && img.ContainsFloat(projX, projY) {
-						r, g, b := img.SampleColor(projX, projY)
-						sumR += int(r)
-						sumG += int(g)
-						sumB += int(b)
+					if v.img.InBounds(projX, projY) && v.img.ContainsFloat(projX, projY) {
+						r, g, b, _ := v.img.SampleColor(projX, projY).RGBA()
+						sumR += int(r >> 8)
+						sumG += int(g >> 8)
+						sumB += int(b >> 8)
 						count++
 					}
 				}
 
-				// Compute averaged color
 				var r, g, b uint8
 				if count > 0 {
 					r = uint8(sumR / count)
@@ -125,6 +130,6 @@ func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, sym
 		}
 	}
 
-	fmt.Printf("  Colored %d points from %d views\n", len(points), len(allCameras))
+	fmt.Printf("  Colored %d points from %d views\n", len(points), len(views))
 	return points
 }
