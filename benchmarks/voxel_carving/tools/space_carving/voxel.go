@@ -1,5 +1,11 @@
 package main
 
+// ColoredPoint represents a 3D point with RGB color.
+type ColoredPoint struct {
+	Position Vec3
+	R, G, B  uint8
+}
+
 // VoxelGrid represents a 3D binary occupancy grid.
 type VoxelGrid struct {
 	Resolution int
@@ -10,8 +16,8 @@ type VoxelGrid struct {
 
 // NewVoxelGrid creates a new voxel grid with all voxels initially occupied.
 func NewVoxelGrid(resolution int, extent float64) *VoxelGrid {
-	size := resolution * resolution * resolution
-	occupied := make([]bool, size)
+	n := resolution * resolution * resolution
+	occupied := make([]bool, n)
 	for i := range occupied {
 		occupied[i] = true
 	}
@@ -51,6 +57,11 @@ func (g *VoxelGrid) Set(ix, iy, iz int, occupied bool) {
 // Clear marks a voxel as unoccupied (carved away).
 func (g *VoxelGrid) Clear(ix, iy, iz int) {
 	g.Occupied[g.Index(ix, iy, iz)] = false
+}
+
+// VoxelSize returns the size of each voxel.
+func (g *VoxelGrid) VoxelSize() float64 {
+	return g.voxelSize
 }
 
 // OccupiedCount returns the number of occupied voxels.

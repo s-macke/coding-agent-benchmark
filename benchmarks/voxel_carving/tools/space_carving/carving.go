@@ -41,21 +41,13 @@ func carveFromView(grid *VoxelGrid, cam *Camera, sil *Silhouette) int {
 		for iy := 0; iy < grid.Resolution; iy++ {
 			for iz := 0; iz < grid.Resolution; iz++ {
 				if !grid.Get(ix, iy, iz) {
-					continue // Already carved
+					continue
 				}
 
-				// Get voxel center in world coordinates
 				pos := grid.Position(ix, iy, iz)
-
-				// Project to 2D
 				projX, projY := cam.Project(pos)
 
-				// Check if projection is in silhouette
-				inBounds := sil.InBounds(projX, projY)
-				inSilhouette := inBounds && sil.ContainsFloat(projX, projY)
-
-				// Carve if outside silhouette
-				if !inSilhouette {
+				if !sil.InBounds(projX, projY) || !sil.ContainsFloat(projX, projY) {
 					grid.Clear(ix, iy, iz)
 					carved++
 				}
@@ -64,4 +56,75 @@ func carveFromView(grid *VoxelGrid, cam *Camera, sil *Silhouette) int {
 	}
 
 	return carved
+}
+
+// SampleColors samples RGB colors for all occupied voxels by projecting to views.
+// Returns colored points with averaged R, G, B values from all visible views.
+func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, symmetry bool) []ColoredPoint {
+	fmt.Println("Sampling colors...")
+
+	// Build list of all cameras and images (including mirrored if symmetry)
+	allCameras := make([]*Camera, 0, len(cameras)*2)
+	allImages := make([]*SpriteImage, 0, len(images)*2)
+
+	for i, cam := range cameras {
+		allCameras = append(allCameras, cam)
+		allImages = append(allImages, images[i])
+	}
+
+	if symmetry {
+		for i, cam := range cameras {
+			allCameras = append(allCameras, cam.Mirror())
+			allImages = append(allImages, images[i].MirrorHorizontal())
+		}
+	}
+
+	points := make([]ColoredPoint, 0, grid.OccupiedCount())
+
+	for ix := 0; ix < grid.Resolution; ix++ {
+		for iy := 0; iy < grid.Resolution; iy++ {
+			for iz := 0; iz < grid.Resolution; iz++ {
+				if !grid.Get(ix, iy, iz) {
+					continue
+				}
+
+				pos := grid.Position(ix, iy, iz)
+
+				// Track color sums for averaging
+				var sumR, sumG, sumB int
+				count := 0
+
+				for i, cam := range allCameras {
+					img := allImages[i]
+					projX, projY := cam.Project(pos)
+
+					if img.InBounds(projX, projY) && img.ContainsFloat(projX, projY) {
+						r, g, b := img.SampleColor(projX, projY)
+						sumR += int(r)
+						sumG += int(g)
+						sumB += int(b)
+						count++
+					}
+				}
+
+				// Compute averaged color
+				var r, g, b uint8
+				if count > 0 {
+					r = uint8(sumR / count)
+					g = uint8(sumG / count)
+					b = uint8(sumB / count)
+				}
+
+				points = append(points, ColoredPoint{
+					Position: pos,
+					R:        r,
+					G:        g,
+					B:        b,
+				})
+			}
+		}
+	}
+
+	fmt.Printf("  Colored %d points from %d views\n", len(points), len(allCameras))
+	return points
 }

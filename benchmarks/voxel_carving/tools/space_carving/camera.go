@@ -39,16 +39,16 @@ func NewCamera(yaw, pitch float64, up, right Vec3, width, height int, orthoScale
 }
 
 // computePosition calculates camera position from yaw and pitch angles.
-// Following SHIP_ANGLES.md conventions:
-// - YAW 0 = rear (camera at -X), 180 = front (camera at +X)
-// - PITCH 90 = below (camera at -Z), -90 = above (camera at +Z)
+// YAW 0 = rear (camera at -X), 180 = front (camera at +X)
+// PITCH 90 = below (camera at -Z), -90 = above (camera at +Z)
 func computePosition(yawDeg, pitchDeg, distance float64) Vec3 {
 	yaw := yawDeg * math.Pi / 180.0
 	pitch := pitchDeg * math.Pi / 180.0
+	cosPitch := math.Cos(pitch)
 
 	return Vec3{
-		X: -distance * math.Cos(yaw) * math.Cos(pitch),
-		Y: distance * math.Sin(yaw) * math.Cos(pitch),
+		X: -distance * math.Cos(yaw) * cosPitch,
+		Y: distance * math.Sin(yaw) * cosPitch,
 		Z: distance * math.Sin(pitch),
 	}
 }
@@ -102,24 +102,22 @@ func (c *Camera) Project(point Vec3) (x, y float64) {
 }
 
 // Mirror creates a new camera mirrored across the Y=0 plane.
-// This is used for exploiting the ship's left-right symmetry.
 func (c *Camera) Mirror() *Camera {
-	// Mirror position, up, and right vectors by negating Y component
-	mirroredPosition := Vec3{c.Position.X, -c.Position.Y, c.Position.Z}
+	// Mirror position and up by negating Y component
+	mirroredPos := Vec3{c.Position.X, -c.Position.Y, c.Position.Z}
 	mirroredUp := Vec3{c.Up.X, -c.Up.Y, c.Up.Z}
-	mirroredRight := Vec3{c.Right.X, -c.Right.Y, c.Right.Z}
-
-	viewMat := buildViewMatrix(mirroredPosition, mirroredUp, mirroredRight)
+	// Right vector: negate X and Z to maintain right-handed coordinate system
+	mirroredRight := Vec3{-c.Right.X, c.Right.Y, -c.Right.Z}
 
 	return &Camera{
-		ViewMat:  viewMat,
+		ViewMat:  buildViewMatrix(mirroredPos, mirroredUp, mirroredRight),
 		Width:    c.Width,
 		Height:   c.Height,
 		Fx:       c.Fx,
 		Fy:       c.Fy,
 		Cx:       c.Cx,
 		Cy:       c.Cy,
-		Position: mirroredPosition,
+		Position: mirroredPos,
 		Up:       mirroredUp,
 		Right:    mirroredRight,
 	}
