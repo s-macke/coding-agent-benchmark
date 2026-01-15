@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 )
@@ -10,6 +11,29 @@ import (
 func fatalf(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(1)
+}
+
+func isCardinalAngle(yaw, pitch float64) bool {
+	// Top or bottom
+	if pitch == 90 || pitch == -90 {
+		return true
+	}
+	// Horizontal plane at 90° yaw intervals
+	if pitch == 0 {
+		yawMod := math.Mod(yaw, 90)
+		return yawMod == 0
+	}
+	return false
+}
+
+func filterCardinalSprites(sprites []Sprite) []Sprite {
+	var result []Sprite
+	for _, s := range sprites {
+		if isCardinalAngle(s.Yaw, s.Pitch) {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 func main() {
@@ -24,8 +48,10 @@ func main() {
 	symmetry := flag.Bool("symmetry", false, "Enable Y-axis mirror symmetry")
 	minVotes := flag.Int("min-votes", 2, "Minimum views that must agree to carve a voxel")
 	mesh := flag.Bool("mesh", false, "Export as mesh with cube faces (instead of point cloud)")
+	vox := flag.Bool("vox", false, "Export as MagicaVoxel .vox format")
 	render := flag.Bool("render", false, "Render comparison images for each view")
 	renderDir := flag.String("renderdir", "renders", "Output directory for rendered images")
+	cardinal := flag.Bool("cardinal", false, "Use only cardinal camera directions (6 orthogonal views)")
 	flag.Parse()
 
 	// Check for unknown arguments
@@ -41,6 +67,11 @@ func main() {
 		fatalf("Error loading sprites: %v", err)
 	}
 	fmt.Printf("  Loaded %d sprites\n", len(sprites))
+
+	if *cardinal {
+		sprites = filterCardinalSprites(sprites)
+		fmt.Printf("  Filtered to %d cardinal views\n", len(sprites))
+	}
 
 	fmt.Println("Loading images and building cameras...")
 	cameras := make([]*Camera, len(sprites))
@@ -79,7 +110,10 @@ func main() {
 	SampleColors(grid, cameras, images, *symmetry)
 
 	fmt.Printf("Exporting %d colored voxels to %s...\n", grid.OccupiedCount(), *outputPath)
-	if *mesh {
+	if *vox {
+		fmt.Println("  Format: MagicaVoxel .vox")
+		err = ExportVOX(grid, *outputPath)
+	} else if *mesh {
 		fmt.Println("  Format: PLY mesh (cubes with faces)")
 		err = ExportMeshPLY(grid, *outputPath)
 	} else {
@@ -87,7 +121,7 @@ func main() {
 		err = ExportColoredPLY(grid, *outputPath)
 	}
 	if err != nil {
-		fatalf("Error exporting PLY: %v", err)
+		fatalf("Error exporting: %v", err)
 	}
 
 	if *render {

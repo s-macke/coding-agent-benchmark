@@ -94,6 +94,45 @@ func (g *VoxelGrid) OccupiedCount() int {
 	return count
 }
 
+// IsSurface returns true if the voxel has at least one empty neighbor.
+// Edge voxels are always considered surface voxels.
+func (g *VoxelGrid) IsSurface(ix, iy, iz int) bool {
+	res := g.Resolution
+	// Check 6 neighbors
+	neighbors := [][3]int{
+		{ix - 1, iy, iz}, {ix + 1, iy, iz},
+		{ix, iy - 1, iz}, {ix, iy + 1, iz},
+		{ix, iy, iz - 1}, {ix, iy, iz + 1},
+	}
+	for _, n := range neighbors {
+		nx, ny, nz := n[0], n[1], n[2]
+		// Out of bounds = empty (surface)
+		if nx < 0 || nx >= res || ny < 0 || ny >= res || nz < 0 || nz >= res {
+			return true
+		}
+		// Empty neighbor = surface
+		if g.Get(nx, ny, nz) <= 0.5 {
+			return true
+		}
+	}
+	return false
+}
+
+// SurfaceCount returns the number of surface voxels.
+func (g *VoxelGrid) SurfaceCount() int {
+	count := 0
+	for ix := 0; ix < g.Resolution; ix++ {
+		for iy := 0; iy < g.Resolution; iy++ {
+			for iz := 0; iz < g.Resolution; iz++ {
+				if g.Get(ix, iy, iz) > 0.5 && g.IsSurface(ix, iy, iz) {
+					count++
+				}
+			}
+		}
+	}
+	return count
+}
+
 // WorldToGrid converts world coordinates to grid indices (not clamped).
 func (g *VoxelGrid) WorldToGrid(pos Vec3) (float64, float64, float64) {
 	fx := (pos.X + g.Extent) / g.voxelSize

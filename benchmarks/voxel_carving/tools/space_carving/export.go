@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"os"
 )
@@ -41,7 +43,7 @@ func ExportColoredPLY(grid *VoxelGrid, path string) error {
 
 	w := bufio.NewWriter(file)
 
-	count := grid.OccupiedCount()
+	count := grid.SurfaceCount()
 
 	fmt.Fprintln(w, "ply")
 	fmt.Fprintln(w, "format ascii 1.0")
@@ -58,7 +60,7 @@ func ExportColoredPLY(grid *VoxelGrid, path string) error {
 		for iy := 0; iy < grid.Resolution; iy++ {
 			for iz := 0; iz < grid.Resolution; iz++ {
 				v := grid.GetVoxel(ix, iy, iz)
-				if v.Opacity <= 0.5 {
+				if v.Opacity <= 0.5 || !grid.IsSurface(ix, iy, iz) {
 					continue
 				}
 				pos := grid.Position(ix, iy, iz)
@@ -83,7 +85,7 @@ func ExportMeshPLY(grid *VoxelGrid, path string) error {
 
 	w := bufio.NewWriter(file)
 
-	numVoxels := grid.OccupiedCount()
+	numVoxels := grid.SurfaceCount()
 	numVertices := numVoxels * 8
 	numFaces := numVoxels * 6
 
@@ -118,7 +120,7 @@ func ExportMeshPLY(grid *VoxelGrid, path string) error {
 		for iy := 0; iy < grid.Resolution; iy++ {
 			for iz := 0; iz < grid.Resolution; iz++ {
 				v := grid.GetVoxel(ix, iy, iz)
-				if v.Opacity <= 0.5 {
+				if v.Opacity <= 0.5 || !grid.IsSurface(ix, iy, iz) {
 					continue
 				}
 				pos := grid.Position(ix, iy, iz)
@@ -148,7 +150,7 @@ func ExportMeshPLY(grid *VoxelGrid, path string) error {
 	for ix := 0; ix < grid.Resolution; ix++ {
 		for iy := 0; iy < grid.Resolution; iy++ {
 			for iz := 0; iz < grid.Resolution; iz++ {
-				if grid.Get(ix, iy, iz) <= 0.5 {
+				if grid.Get(ix, iy, iz) <= 0.5 || !grid.IsSurface(ix, iy, iz) {
 					continue
 				}
 				baseVertex := voxelIdx * 8
@@ -163,6 +165,118 @@ func ExportMeshPLY(grid *VoxelGrid, path string) error {
 			}
 		}
 	}
+
+	return w.Flush()
+}
+
+// ExportVOX exports colored voxels as a MagicaVoxel .vox file.
+func ExportVOX(grid *VoxelGrid, path string) error {
+	if grid.Resolution > 256 {
+		return fmt.Errorf("grid resolution %d exceeds .vox maximum of 256", grid.Resolution)
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	w := bufio.NewWriter(file)
+
+	// Collect surface voxels and build color palette
+	type voxelData struct {
+		x, y, z    uint8
+		colorIndex uint8
+	}
+	var voxels []voxelData
+	colorToIndex := make(map[uint32]uint8) // RGB packed -> palette index
+	var palette [][4]uint8                 // RGBA values
+	nextIndex := uint8(1)                  // Index 0 is reserved (empty)
+
+	for ix := 0; ix < grid.Resolution; ix++ {
+		for iy := 0; iy < grid.Resolution; iy++ {
+			for iz := 0; iz < grid.Resolution; iz++ {
+				v := grid.GetVoxel(ix, iy, iz)
+				if v.Opacity <= 0.5 || !grid.IsSurface(ix, iy, iz) {
+					continue
+				}
+
+				r, g, b, _ := v.Color().RGBA()
+				colorKey := uint32(r)<<16 | uint32(g)<<8 | uint32(b)
+
+				idx, exists := colorToIndex[colorKey]
+				if !exists {
+					if nextIndex == 0 { // Wrapped around, too many colors
+						return fmt.Errorf("too many unique colors (>255)")
+					}
+					idx = nextIndex
+					colorToIndex[colorKey] = idx
+					palette = append(palette, [4]uint8{uint8(r), uint8(g), uint8(b), 255})
+					nextIndex++
+				}
+
+				voxels = append(voxels, voxelData{
+					x:          uint8(ix),
+					y:          uint8(iy),
+					z:          uint8(iz),
+					colorIndex: idx,
+				})
+			}
+		}
+	}
+
+	// Build SIZE chunk content
+	sizeContent := new(bytes.Buffer)
+	binary.Write(sizeContent, binary.LittleEndian, int32(grid.Resolution))
+	binary.Write(sizeContent, binary.LittleEndian, int32(grid.Resolution))
+	binary.Write(sizeContent, binary.LittleEndian, int32(grid.Resolution))
+
+	// Build XYZI chunk content
+	xyziContent := new(bytes.Buffer)
+	binary.Write(xyziContent, binary.LittleEndian, int32(len(voxels)))
+	for _, v := range voxels {
+		xyziContent.Write([]byte{v.x, v.y, v.z, v.colorIndex})
+	}
+
+	// Build RGBA chunk content (256 colors × 4 bytes)
+	rgbaContent := new(bytes.Buffer)
+	for i := 0; i < 256; i++ {
+		if i < len(palette) {
+			rgbaContent.Write(palette[i][:])
+		} else {
+			rgbaContent.Write([]byte{0, 0, 0, 255}) // Default unused colors
+		}
+	}
+
+	// Calculate MAIN chunk children size
+	childrenSize := 12 + sizeContent.Len() + 12 + xyziContent.Len() + 12 + rgbaContent.Len()
+
+	// Write file header
+	w.Write([]byte("VOX "))
+	binary.Write(w, binary.LittleEndian, int32(150)) // Version
+
+	// Write MAIN chunk header
+	w.Write([]byte("MAIN"))
+	binary.Write(w, binary.LittleEndian, int32(0))            // Content size (0 for MAIN)
+	binary.Write(w, binary.LittleEndian, int32(childrenSize)) // Children size
+
+	// Write SIZE chunk
+	w.Write([]byte("SIZE"))
+	binary.Write(w, binary.LittleEndian, int32(sizeContent.Len()))
+	binary.Write(w, binary.LittleEndian, int32(0))
+	w.Write(sizeContent.Bytes())
+
+	// Write XYZI chunk
+	w.Write([]byte("XYZI"))
+	binary.Write(w, binary.LittleEndian, int32(xyziContent.Len()))
+	binary.Write(w, binary.LittleEndian, int32(0))
+	w.Write(xyziContent.Bytes())
+
+	// Write RGBA chunk
+	w.Write([]byte("RGBA"))
+	binary.Write(w, binary.LittleEndian, int32(rgbaContent.Len()))
+	binary.Write(w, binary.LittleEndian, int32(0))
+	w.Write(rgbaContent.Bytes())
 
 	return w.Flush()
 }
