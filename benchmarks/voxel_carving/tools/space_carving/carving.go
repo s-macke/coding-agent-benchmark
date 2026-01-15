@@ -2,68 +2,67 @@ package main
 
 import "fmt"
 
-// CarveVisualHull performs space carving from multiple silhouettes.
-// For each view, voxel opacity is multiplied by the sampled alpha.
-// If symmetry is true, also uses mirrored views (doubles effective views).
-func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, symmetry bool) {
-	numViews := len(cameras)
-	if symmetry {
-		numViews *= 2
-	}
-	fmt.Printf("Carving with %d views (symmetry=%v)...\n", numViews, symmetry)
-
-	// Carve with original views
-	for viewIdx, cam := range cameras {
-		img := images[viewIdx]
-		carved := carveFromView(grid, cam, img, false)
-		fmt.Printf("  View %d: reduced opacity for %d voxels\n", viewIdx, carved)
-	}
-
-	// Carve with mirrored views if symmetry enabled
-	if symmetry {
-		for viewIdx, cam := range cameras {
-			img := images[viewIdx]
-			mirroredCam := cam.Mirror()
-			carved := carveFromView(grid, mirroredCam, img, true)
-			fmt.Printf("  View %d (mirrored): reduced opacity for %d voxels\n", viewIdx, carved)
-		}
-	}
-
-	fmt.Printf("Visual hull: %d voxels with opacity > 0.5\n", grid.OccupiedCount())
+// viewInfo holds camera and image info for a single view.
+type viewInfo struct {
+	cam     *Camera
+	img     *SpriteImage
+	mirrorX bool
 }
 
-// carveFromView multiplies voxel opacity by sampled alpha from the image.
-// If mirrorX is true, flips X coordinate to simulate mirrored image.
-// Returns count of voxels whose opacity was reduced (alpha < 1).
-func carveFromView(grid *VoxelGrid, cam *Camera, img *SpriteImage, mirrorX bool) int {
-	reduced := 0
-	imgWidth := float64(img.Width())
+// buildViews creates a list of all views including mirrored ones if symmetry is enabled.
+func buildViews(cameras []*Camera, images []*SpriteImage, symmetry bool) []viewInfo {
+	views := make([]viewInfo, 0, len(cameras)*2)
+	for i, cam := range cameras {
+		views = append(views, viewInfo{cam, images[i], false})
+	}
+	if symmetry {
+		for i, cam := range cameras {
+			views = append(views, viewInfo{cam.Mirror(), images[i], true})
+		}
+	}
+	return views
+}
 
+// CarveVisualHull performs space carving from multiple silhouettes using vote counting.
+// A voxel is carved only if at least minVotes views agree (alpha < 0.5).
+// If symmetry is true, also uses mirrored views (doubles effective views).
+func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, symmetry bool, minVotes int) {
+	views := buildViews(cameras, images, symmetry)
+	fmt.Printf("Carving with %d views (symmetry=%v, minVotes=%d)...\n", len(views), symmetry, minVotes)
+
+	carved := 0
 	for ix := 0; ix < grid.Resolution; ix++ {
 		for iy := 0; iy < grid.Resolution; iy++ {
 			for iz := 0; iz < grid.Resolution; iz++ {
-				opacity := grid.Get(ix, iy, iz)
-				if opacity < 0.001 {
+				if grid.Get(ix, iy, iz) < 0.001 {
 					continue // Already fully transparent
 				}
 
 				pos := grid.Position(ix, iy, iz)
-				projX, projY := cam.Project(pos)
+				carveVotes := 0
 
-				if mirrorX {
-					projX = imgWidth - projX
+				for _, v := range views {
+					projX, projY := v.cam.Project(pos)
+					if v.mirrorX {
+						projX = float64(v.img.Width()) - projX
+					}
+
+					c := v.img.Sample(projX, projY)
+					if c.A < 0.5 {
+						carveVotes++
+					}
 				}
 
-				c := img.Sample(projX, projY)
-				if c.A < 1.0 {
-					grid.MultiplyOpacity(ix, iy, iz, c.A)
-					reduced++
+				if carveVotes >= minVotes {
+					grid.Set(ix, iy, iz, 0)
+					carved++
 				}
 			}
 		}
 	}
 
-	return reduced
+	fmt.Printf("  Carved %d voxels (required %d+ votes)\n", carved, minVotes)
+	fmt.Printf("Visual hull: %d voxels with opacity > 0.5\n", grid.OccupiedCount())
 }
 
 // SampleColors samples RGB colors for all occupied voxels by projecting to views.

@@ -22,6 +22,7 @@ func main() {
 	distance := flag.Float64("distance", 5.0, "Camera distance")
 	alphaThreshold := flag.Float64("alpha", 0.5, "Alpha threshold")
 	symmetry := flag.Bool("symmetry", false, "Enable Y-axis mirror symmetry")
+	minVotes := flag.Int("min-votes", 2, "Minimum views that must agree to carve a voxel")
 	mesh := flag.Bool("mesh", false, "Export as mesh with cube faces (instead of point cloud)")
 	render := flag.Bool("render", false, "Render comparison images for each view")
 	renderDir := flag.String("renderdir", "renders", "Output directory for rendered images")
@@ -73,7 +74,7 @@ func main() {
 	fmt.Printf("  Initial voxels: %d\n", grid.OccupiedCount())
 
 	fmt.Println("Carving visual hull...")
-	CarveVisualHull(grid, cameras, images, *symmetry)
+	CarveVisualHull(grid, cameras, images, *symmetry, *minVotes)
 
 	SampleColors(grid, cameras, images, *symmetry)
 
