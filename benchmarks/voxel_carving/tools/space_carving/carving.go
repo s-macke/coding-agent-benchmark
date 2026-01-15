@@ -54,9 +54,9 @@ func carveFromView(grid *VoxelGrid, cam *Camera, img *SpriteImage, mirrorX bool)
 					projX = imgWidth - projX
 				}
 
-				alpha := img.SampleAlpha(projX, projY)
-				if alpha < 1.0 {
-					grid.MultiplyOpacity(ix, iy, iz, alpha)
+				c := img.Sample(projX, projY)
+				if c.A < 1.0 {
+					grid.MultiplyOpacity(ix, iy, iz, c.A)
 					reduced++
 				}
 			}
@@ -111,15 +111,13 @@ func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, sym
 						projX = float64(v.img.Width()) - projX
 					}
 
-					alpha := v.img.SampleAlpha(projX, projY)
-					if alpha > 0.01 {
-						cr, cg, cb, _ := v.img.SampleColor(projX, projY).RGBA()
-						r, g, b := float64(cr>>8), float64(cg>>8), float64(cb>>8)
+					c := v.img.Sample(projX, projY)
+					if c.A > 0.01 {
 						// Weight by alpha for better color blending
-						sumR += r * alpha
-						sumG += g * alpha
-						sumB += b * alpha
-						totalWeight += alpha
+						sumR += c.R * c.A
+						sumG += c.G * c.A
+						sumB += c.B * c.A
+						totalWeight += c.A
 					}
 				}
 

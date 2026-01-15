@@ -66,7 +66,8 @@ func RenderView(grid *VoxelGrid, cam *Camera) *image.RGBA {
 				}
 
 				// Fill all pixels with depth test
-				col := color.RGBA{R: uint8(v.R), G: uint8(v.G), B: uint8(v.B), A: 255}
+				r, g, b, _ := v.Color().RGBA()
+				col := color.RGBA{R: r, G: g, B: b, A: 255}
 				for py := minY; py < maxY; py++ {
 					for px := minX; px < maxX; px++ {
 						idx := py*width + px

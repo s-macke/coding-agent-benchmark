@@ -62,9 +62,9 @@ func ExportColoredPLY(grid *VoxelGrid, path string) error {
 					continue
 				}
 				pos := grid.Position(ix, iy, iz)
+				r, g, b, _ := v.Color().RGBA()
 				fmt.Fprintf(w, "%f %f %f %d %d %d\n",
-					pos.X, pos.Y, pos.Z,
-					uint8(v.R), uint8(v.G), uint8(v.B))
+					pos.X, pos.Y, pos.Z, r, g, b)
 			}
 		}
 	}
@@ -122,7 +122,7 @@ func ExportMeshPLY(grid *VoxelGrid, path string) error {
 					continue
 				}
 				pos := grid.Position(ix, iy, iz)
-				r, g, b := uint8(v.R), uint8(v.G), uint8(v.B)
+				r, g, b, _ := v.Color().RGBA()
 				for _, off := range offsets {
 					fmt.Fprintf(w, "%f %f %f %d %d %d\n",
 						pos.X+off[0],

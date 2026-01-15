@@ -6,6 +6,11 @@ type Voxel struct {
 	R, G, B float64
 }
 
+// Color returns the voxel's color as a Color struct.
+func (v *Voxel) Color() Color {
+	return Color{R: v.R, G: v.G, B: v.B, A: 1.0}
+}
+
 // VoxelGrid represents a 3D grid of voxels.
 type VoxelGrid struct {
 	Resolution int
