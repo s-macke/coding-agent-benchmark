@@ -3,7 +3,7 @@
 Render Gaussian Splats from PLY file and compare to original sprites.
 
 Usage:
-    python tools/render_gaussians.py [options]
+    python -m gs.render_gaussians [options]
 
 Options:
     --input PATH        Input PLY file (default: ship_gaussians.ply)
@@ -20,14 +20,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from sprite_to_3dgs import (
-    IMAGE_SIZE,
-    SH_C0,
-    build_cameras,
-    load_sprites,
-    render_gaussians_simple,
-    try_gsplat_render,
-)
+from .constants import IMAGE_SIZE, SH_C0
+from .sprites import load_sprites
+from .camera import build_cameras
+from .render import try_gsplat_render
 
 
 def load_ply(path: str) -> Tuple[torch.Tensor, ...]:
@@ -270,7 +266,7 @@ def main() -> None:
     parser.add_argument('--ortho-scale', type=float, default=2.0, help='Orthographic scale')
     args = parser.parse_args()
 
-    project_dir = Path(__file__).parent.parent
+    project_dir = Path(__file__).parent.parent.parent
 
     # Load gaussians from PLY
     ply_path = project_dir / args.input
