@@ -62,11 +62,15 @@ type Camera struct {
     Height     int
     Fx, Fy     float64  // Orthographic focal lengths
     Cx, Cy     float64  // Principal point (image center)
+    Position   Vec3     // Camera position (for mirroring)
+    Up         Vec3     // Camera up vector (for mirroring)
+    Right      Vec3     // Camera right vector (for mirroring)
 }
 
 func NewCamera(yaw, pitch float64, up, right Vec3,
                width, height int, orthoScale, distance float64) *Camera
 func (c *Camera) Project(point Vec3) (x, y float64)
+func (c *Camera) Mirror() *Camera  // For symmetry
 ```
 
 **Internal functions:**
@@ -111,6 +115,7 @@ type Silhouette struct {
 func LoadSilhouette(path string, alphaThreshold float64) (*Silhouette, error)
 func (s *Silhouette) Contains(x, y int) bool
 func (s *Silhouette) InBounds(x, y float64) bool
+func (s *Silhouette) MirrorHorizontal() *Silhouette  // For symmetry
 ```
 
 ### 5. voxel.go - Voxel Grid
@@ -138,7 +143,7 @@ func (g *VoxelGrid) OccupiedCount() int
 Core carving logic.
 
 ```go
-func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, silhouettes []*Silhouette)
+func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, silhouettes []*Silhouette, symmetry bool)
 ```
 
 **Algorithm:**
@@ -189,6 +194,7 @@ Entry point with command-line interface.
 | `-ortho` | `2.0` | Orthographic scale |
 | `-distance` | `5.0` | Camera distance |
 | `-alpha` | `0.5` | Alpha threshold |
+| `-symmetry` | `false` | Enable Y-axis mirror symmetry |
 
 **Workflow:**
 1. Parse CLI flags
@@ -257,6 +263,26 @@ Based on `tools/sprite_to_3dgs.py`:
 - Lines 119-130: `build_orthographic_K()`
 - Lines 156-174: `project_points_orthographic()`
 - Lines 177-215: `carve_visual_hull()`
+
+---
+
+## Symmetry Option
+
+The sprites only cover yaw 0°-180° (right half of the viewing sphere). The ship has **Y-axis mirror symmetry** (left-right symmetry, since +Y is the right wing direction).
+
+When `-symmetry` is enabled:
+1. For each of the 37 views, a mirrored view is also created (74 total views)
+2. Camera position/vectors are mirrored by negating Y components
+3. Silhouettes are horizontally flipped
+4. This enforces symmetric carving and improves reconstruction quality
+
+**Mirror Transform:**
+```go
+mirroredPosition = Vec3{position.X, -position.Y, position.Z}
+mirroredUp = Vec3{up.X, -up.Y, up.Z}
+mirroredRight = Vec3{right.X, -right.Y, right.Z}
+mirroredSilhouette = silhouette.MirrorHorizontal()
+```
 
 ---
 
