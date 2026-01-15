@@ -31,8 +31,8 @@ func ExportPLY(points []Vec3, path string) error {
 	return w.Flush()
 }
 
-// ExportColoredPLY exports colored points as an ASCII PLY point cloud with RGB.
-func ExportColoredPLY(points []ColoredPoint, path string) error {
+// ExportColoredPLY exports colored voxels from grid as an ASCII PLY point cloud with RGB.
+func ExportColoredPLY(grid *VoxelGrid, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -41,9 +41,11 @@ func ExportColoredPLY(points []ColoredPoint, path string) error {
 
 	w := bufio.NewWriter(file)
 
+	count := grid.OccupiedCount()
+
 	fmt.Fprintln(w, "ply")
 	fmt.Fprintln(w, "format ascii 1.0")
-	fmt.Fprintf(w, "element vertex %d\n", len(points))
+	fmt.Fprintf(w, "element vertex %d\n", count)
 	fmt.Fprintln(w, "property float x")
 	fmt.Fprintln(w, "property float y")
 	fmt.Fprintln(w, "property float z")
@@ -52,10 +54,19 @@ func ExportColoredPLY(points []ColoredPoint, path string) error {
 	fmt.Fprintln(w, "property uchar blue")
 	fmt.Fprintln(w, "end_header")
 
-	for _, p := range points {
-		fmt.Fprintf(w, "%f %f %f %d %d %d\n",
-			p.Position.X, p.Position.Y, p.Position.Z,
-			p.R, p.G, p.B)
+	for ix := 0; ix < grid.Resolution; ix++ {
+		for iy := 0; iy < grid.Resolution; iy++ {
+			for iz := 0; iz < grid.Resolution; iz++ {
+				v := grid.GetVoxel(ix, iy, iz)
+				if v.Opacity <= 0.5 {
+					continue
+				}
+				pos := grid.Position(ix, iy, iz)
+				fmt.Fprintf(w, "%f %f %f %d %d %d\n",
+					pos.X, pos.Y, pos.Z,
+					uint8(v.R), uint8(v.G), uint8(v.B))
+			}
+		}
 	}
 
 	return w.Flush()
@@ -63,7 +74,7 @@ func ExportColoredPLY(points []ColoredPoint, path string) error {
 
 // ExportMeshPLY exports colored voxels as a PLY mesh with cube geometry.
 // Each voxel becomes a cube with 8 vertices and 6 quad faces.
-func ExportMeshPLY(points []ColoredPoint, voxelSize float64, path string) error {
+func ExportMeshPLY(grid *VoxelGrid, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -72,7 +83,7 @@ func ExportMeshPLY(points []ColoredPoint, voxelSize float64, path string) error 
 
 	w := bufio.NewWriter(file)
 
-	numVoxels := len(points)
+	numVoxels := grid.OccupiedCount()
 	numVertices := numVoxels * 8
 	numFaces := numVoxels * 6
 
@@ -89,7 +100,7 @@ func ExportMeshPLY(points []ColoredPoint, voxelSize float64, path string) error 
 	fmt.Fprintln(w, "property list uchar int vertex_indices")
 	fmt.Fprintln(w, "end_header")
 
-	half := voxelSize / 2.0
+	half := grid.VoxelSize() / 2.0
 
 	// Cube corner offsets relative to center (ordered for consistent face winding)
 	offsets := [8][3]float64{
@@ -103,13 +114,23 @@ func ExportMeshPLY(points []ColoredPoint, voxelSize float64, path string) error 
 		{-half, +half, +half}, // 7: front-left-top
 	}
 
-	for _, p := range points {
-		for _, off := range offsets {
-			fmt.Fprintf(w, "%f %f %f %d %d %d\n",
-				p.Position.X+off[0],
-				p.Position.Y+off[1],
-				p.Position.Z+off[2],
-				p.R, p.G, p.B)
+	for ix := 0; ix < grid.Resolution; ix++ {
+		for iy := 0; iy < grid.Resolution; iy++ {
+			for iz := 0; iz < grid.Resolution; iz++ {
+				v := grid.GetVoxel(ix, iy, iz)
+				if v.Opacity <= 0.5 {
+					continue
+				}
+				pos := grid.Position(ix, iy, iz)
+				r, g, b := uint8(v.R), uint8(v.G), uint8(v.B)
+				for _, off := range offsets {
+					fmt.Fprintf(w, "%f %f %f %d %d %d\n",
+						pos.X+off[0],
+						pos.Y+off[1],
+						pos.Z+off[2],
+						r, g, b)
+				}
+			}
 		}
 	}
 
@@ -123,14 +144,23 @@ func ExportMeshPLY(points []ColoredPoint, voxelSize float64, path string) error 
 		{1, 2, 6, 5}, // right (+X)
 	}
 
-	for voxelIdx := 0; voxelIdx < numVoxels; voxelIdx++ {
-		baseVertex := voxelIdx * 8
-		for _, face := range faceIndices {
-			fmt.Fprintf(w, "4 %d %d %d %d\n",
-				baseVertex+face[0],
-				baseVertex+face[1],
-				baseVertex+face[2],
-				baseVertex+face[3])
+	voxelIdx := 0
+	for ix := 0; ix < grid.Resolution; ix++ {
+		for iy := 0; iy < grid.Resolution; iy++ {
+			for iz := 0; iz < grid.Resolution; iz++ {
+				if grid.Get(ix, iy, iz) <= 0.5 {
+					continue
+				}
+				baseVertex := voxelIdx * 8
+				for _, face := range faceIndices {
+					fmt.Fprintf(w, "4 %d %d %d %d\n",
+						baseVertex+face[0],
+						baseVertex+face[1],
+						baseVertex+face[2],
+						baseVertex+face[3])
+				}
+				voxelIdx++
+			}
 		}
 	}
 

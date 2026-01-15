@@ -67,8 +67,8 @@ func carveFromView(grid *VoxelGrid, cam *Camera, img *SpriteImage, mirrorX bool)
 }
 
 // SampleColors samples RGB colors for all occupied voxels by projecting to views.
-// Returns colored points with averaged R, G, B values from all visible views.
-func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, symmetry bool) []ColoredPoint {
+// Colors are stored directly in the grid using minimum value per channel.
+func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, symmetry bool) {
 	fmt.Println("Sampling colors...")
 
 	// Build list of cameras with mirror flags
@@ -88,8 +88,7 @@ func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, sym
 		}
 	}
 
-	points := make([]ColoredPoint, 0, grid.OccupiedCount())
-
+	colored := 0
 	for ix := 0; ix < grid.Resolution; ix++ {
 		for iy := 0; iy < grid.Resolution; iy++ {
 			for iz := 0; iz < grid.Resolution; iz++ {
@@ -114,32 +113,23 @@ func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, sym
 
 					alpha := v.img.SampleAlpha(projX, projY)
 					if alpha > 0.01 {
-						r, g, b, _ := v.img.SampleColor(projX, projY).RGBA()
+						cr, cg, cb, _ := v.img.SampleColor(projX, projY).RGBA()
+						r, g, b := float64(cr>>8), float64(cg>>8), float64(cb>>8)
 						// Weight by alpha for better color blending
-						sumR += float64(r>>8) * alpha
-						sumG += float64(g>>8) * alpha
-						sumB += float64(b>>8) * alpha
+						sumR += r * alpha
+						sumG += g * alpha
+						sumB += b * alpha
 						totalWeight += alpha
 					}
 				}
 
-				var r, g, b uint8
 				if totalWeight > 0 {
-					r = uint8(sumR / totalWeight)
-					g = uint8(sumG / totalWeight)
-					b = uint8(sumB / totalWeight)
+					grid.SetColor(ix, iy, iz, sumR/totalWeight, sumG/totalWeight, sumB/totalWeight)
+					colored++
 				}
-
-				points = append(points, ColoredPoint{
-					Position: pos,
-					R:        r,
-					G:        g,
-					B:        b,
-				})
 			}
 		}
 	}
 
-	fmt.Printf("  Colored %d points from %d views\n", len(points), len(views))
-	return points
+	fmt.Printf("  Colored %d voxels from %d views\n", colored, len(views))
 }

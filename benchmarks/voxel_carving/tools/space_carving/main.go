@@ -75,22 +75,22 @@ func main() {
 	fmt.Println("Carving visual hull...")
 	CarveVisualHull(grid, cameras, images, *symmetry)
 
-	coloredPoints := SampleColors(grid, cameras, images, *symmetry)
+	SampleColors(grid, cameras, images, *symmetry)
 
-	fmt.Printf("Exporting %d colored voxels to %s...\n", len(coloredPoints), *outputPath)
+	fmt.Printf("Exporting %d colored voxels to %s...\n", grid.OccupiedCount(), *outputPath)
 	if *mesh {
 		fmt.Println("  Format: PLY mesh (cubes with faces)")
-		err = ExportMeshPLY(coloredPoints, grid.VoxelSize(), *outputPath)
+		err = ExportMeshPLY(grid, *outputPath)
 	} else {
 		fmt.Println("  Format: PLY point cloud")
-		err = ExportColoredPLY(coloredPoints, *outputPath)
+		err = ExportColoredPLY(grid, *outputPath)
 	}
 	if err != nil {
 		fatalf("Error exporting PLY: %v", err)
 	}
 
 	if *render {
-		err = RenderAllViews(coloredPoints, cameras, sprites, grid.VoxelSize(), *imagesDir, *renderDir)
+		err = RenderAllViews(grid, cameras, sprites, *imagesDir, *renderDir)
 		if err != nil {
 			fatalf("Error rendering views: %v", err)
 		}
