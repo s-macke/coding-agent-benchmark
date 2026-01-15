@@ -68,5 +68,25 @@ func (s *Silhouette) ContainsFloat(x, y float64) bool {
 	return s.Contains(ix, iy)
 }
 
+// MirrorHorizontal creates a new silhouette that is horizontally flipped.
+// This is used for exploiting the ship's left-right symmetry.
+func (s *Silhouette) MirrorHorizontal() *Silhouette {
+	mask := make([]bool, len(s.Mask))
+
+	for y := 0; y < s.Height; y++ {
+		for x := 0; x < s.Width; x++ {
+			// Map x to (Width - 1 - x) for horizontal flip
+			mirroredX := s.Width - 1 - x
+			mask[y*s.Width+x] = s.Mask[y*s.Width+mirroredX]
+		}
+	}
+
+	return &Silhouette{
+		Width:  s.Width,
+		Height: s.Height,
+		Mask:   mask,
+	}
+}
+
 // Ensure image package is imported for bounds type
 var _ image.Image

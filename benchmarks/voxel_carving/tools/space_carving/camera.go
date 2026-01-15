@@ -4,11 +4,14 @@ import "math"
 
 // Camera represents an orthographic camera with view matrix and projection parameters.
 type Camera struct {
-	ViewMat Mat4
-	Width   int
-	Height  int
-	Fx, Fy  float64 // Orthographic focal lengths
-	Cx, Cy  float64 // Principal point (image center)
+	ViewMat  Mat4
+	Width    int
+	Height   int
+	Fx, Fy   float64 // Orthographic focal lengths
+	Cx, Cy   float64 // Principal point (image center)
+	Position Vec3    // Camera position (for mirroring)
+	Up       Vec3    // Camera up vector (for mirroring)
+	Right    Vec3    // Camera right vector (for mirroring)
 }
 
 // NewCamera creates a camera from sprite parameters.
@@ -22,13 +25,16 @@ func NewCamera(yaw, pitch float64, up, right Vec3, width, height int, orthoScale
 	cy := float64(height) / 2.0
 
 	return &Camera{
-		ViewMat: viewMat,
-		Width:   width,
-		Height:  height,
-		Fx:      fx,
-		Fy:      fy,
-		Cx:      cx,
-		Cy:      cy,
+		ViewMat:  viewMat,
+		Width:    width,
+		Height:   height,
+		Fx:       fx,
+		Fy:       fy,
+		Cx:       cx,
+		Cy:       cy,
+		Position: position,
+		Up:       up,
+		Right:    right,
 	}
 }
 
@@ -93,4 +99,28 @@ func (c *Camera) Project(point Vec3) (x, y float64) {
 	y = c.Fy*camCoords.Y + c.Cy
 
 	return x, y
+}
+
+// Mirror creates a new camera mirrored across the Y=0 plane.
+// This is used for exploiting the ship's left-right symmetry.
+func (c *Camera) Mirror() *Camera {
+	// Mirror position, up, and right vectors by negating Y component
+	mirroredPosition := Vec3{c.Position.X, -c.Position.Y, c.Position.Z}
+	mirroredUp := Vec3{c.Up.X, -c.Up.Y, c.Up.Z}
+	mirroredRight := Vec3{c.Right.X, -c.Right.Y, c.Right.Z}
+
+	viewMat := buildViewMatrix(mirroredPosition, mirroredUp, mirroredRight)
+
+	return &Camera{
+		ViewMat:  viewMat,
+		Width:    c.Width,
+		Height:   c.Height,
+		Fx:       c.Fx,
+		Fy:       c.Fy,
+		Cx:       c.Cx,
+		Cy:       c.Cy,
+		Position: mirroredPosition,
+		Up:       mirroredUp,
+		Right:    mirroredRight,
+	}
 }

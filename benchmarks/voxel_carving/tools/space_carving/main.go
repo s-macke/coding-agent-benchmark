@@ -17,6 +17,7 @@ func main() {
 	orthoScale := flag.Float64("ortho", 2.0, "Orthographic scale")
 	distance := flag.Float64("distance", 5.0, "Camera distance")
 	alphaThreshold := flag.Float64("alpha", 0.5, "Alpha threshold")
+	symmetry := flag.Bool("symmetry", false, "Enable Y-axis mirror symmetry")
 
 	flag.Parse()
 
@@ -64,7 +65,7 @@ func main() {
 
 	// Perform carving
 	fmt.Println("Carving visual hull...")
-	CarveVisualHull(grid, cameras, silhouettes)
+	CarveVisualHull(grid, cameras, silhouettes, *symmetry)
 
 	// Export result
 	points := grid.OccupiedPositions()
