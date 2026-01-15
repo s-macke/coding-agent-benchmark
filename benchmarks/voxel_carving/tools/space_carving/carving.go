@@ -102,6 +102,11 @@ func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, sym
 				var totalWeight float64
 
 				for _, v := range views {
+					// Check if voxel is visible from this camera using DDA
+					if !grid.IsVisibleFrom(ix, iy, iz, v.cam.Position) {
+						continue // Occluded, skip this view
+					}
+
 					projX, projY := v.cam.Project(pos)
 					if v.mirrorX {
 						projX = float64(v.img.Width()) - projX
