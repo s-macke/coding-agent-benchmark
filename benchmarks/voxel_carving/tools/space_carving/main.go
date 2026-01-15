@@ -27,6 +27,13 @@ func main() {
 	renderDir := flag.String("renderdir", "renders", "Output directory for rendered images")
 	flag.Parse()
 
+	// Check for unknown arguments
+	if flag.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "Error: unknown argument(s): %v\n", flag.Args())
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	fmt.Printf("Loading sprites from %s...\n", *jsonPath)
 	sprites, err := LoadSprites(*jsonPath)
 	if err != nil {
