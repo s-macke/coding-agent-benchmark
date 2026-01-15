@@ -6,26 +6,26 @@ type ColoredPoint struct {
 	R, G, B  uint8
 }
 
-// VoxelGrid represents a 3D binary occupancy grid.
+// VoxelGrid represents a 3D occupancy grid with continuous opacity.
 type VoxelGrid struct {
 	Resolution int
 	Extent     float64
-	Occupied   []bool  // flattened [Resolution^3]
-	voxelSize  float64 // size of each voxel
+	Opacity    []float64 // flattened [Resolution^3], values 0-1
+	voxelSize  float64   // size of each voxel
 }
 
-// NewVoxelGrid creates a new voxel grid with all voxels initially occupied.
+// NewVoxelGrid creates a new voxel grid with all voxels initially fully opaque.
 func NewVoxelGrid(resolution int, extent float64) *VoxelGrid {
 	n := resolution * resolution * resolution
-	occupied := make([]bool, n)
-	for i := range occupied {
-		occupied[i] = true
+	opacity := make([]float64, n)
+	for i := range opacity {
+		opacity[i] = 1.0
 	}
 
 	return &VoxelGrid{
 		Resolution: resolution,
 		Extent:     extent,
-		Occupied:   occupied,
+		Opacity:    opacity,
 		voxelSize:  (2 * extent) / float64(resolution),
 	}
 }
@@ -44,19 +44,20 @@ func (g *VoxelGrid) Position(ix, iy, iz int) Vec3 {
 	return Vec3{x, y, z}
 }
 
-// Get returns the occupancy of a voxel.
-func (g *VoxelGrid) Get(ix, iy, iz int) bool {
-	return g.Occupied[g.Index(ix, iy, iz)]
+// Get returns the opacity of a voxel (0-1).
+func (g *VoxelGrid) Get(ix, iy, iz int) float64 {
+	return g.Opacity[g.Index(ix, iy, iz)]
 }
 
-// Set sets the occupancy of a voxel.
-func (g *VoxelGrid) Set(ix, iy, iz int, occupied bool) {
-	g.Occupied[g.Index(ix, iy, iz)] = occupied
+// Set sets the opacity of a voxel.
+func (g *VoxelGrid) Set(ix, iy, iz int, opacity float64) {
+	g.Opacity[g.Index(ix, iy, iz)] = opacity
 }
 
-// Clear marks a voxel as unoccupied (carved away).
-func (g *VoxelGrid) Clear(ix, iy, iz int) {
-	g.Occupied[g.Index(ix, iy, iz)] = false
+// MultiplyOpacity multiplies the voxel's opacity by a factor.
+func (g *VoxelGrid) MultiplyOpacity(ix, iy, iz int, factor float64) {
+	idx := g.Index(ix, iy, iz)
+	g.Opacity[idx] *= factor
 }
 
 // VoxelSize returns the size of each voxel.
@@ -64,24 +65,24 @@ func (g *VoxelGrid) VoxelSize() float64 {
 	return g.voxelSize
 }
 
-// OccupiedCount returns the number of occupied voxels.
+// OccupiedCount returns the number of voxels with opacity > 0.5.
 func (g *VoxelGrid) OccupiedCount() int {
 	count := 0
-	for _, occ := range g.Occupied {
-		if occ {
+	for _, occ := range g.Opacity {
+		if occ > 0.5 {
 			count++
 		}
 	}
 	return count
 }
 
-// OccupiedPositions returns world positions of all occupied voxels.
+// OccupiedPositions returns world positions of all voxels with opacity > 0.5.
 func (g *VoxelGrid) OccupiedPositions() []Vec3 {
 	positions := make([]Vec3, 0, g.OccupiedCount())
 	for ix := 0; ix < g.Resolution; ix++ {
 		for iy := 0; iy < g.Resolution; iy++ {
 			for iz := 0; iz < g.Resolution; iz++ {
-				if g.Get(ix, iy, iz) {
+				if g.Get(ix, iy, iz) > 0.5 {
 					positions = append(positions, g.Position(ix, iy, iz))
 				}
 			}
