@@ -53,8 +53,9 @@ func (s *SpriteImage) Contains(x, y int) bool {
 }
 
 // InBounds checks if the coordinates are within image bounds.
+// Pixel centers are at 0.5 offsets, so valid range is [0, Width) and [0, Height).
 func (s *SpriteImage) InBounds(x, y float64) bool {
-	return x >= 0 && x < float64(s.Width())-1 && y >= 0 && y < float64(s.Height())-1
+	return x >= 0 && x < float64(s.Width()) && y >= 0 && y < float64(s.Height())
 }
 
 // ContainsFloat returns true if the pixel at float coordinates is inside the silhouette.

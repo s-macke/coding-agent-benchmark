@@ -36,7 +36,7 @@ func CarveVisualHull(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, 
 // If mirrorX is true, flips X coordinate to simulate mirrored image.
 func carveFromView(grid *VoxelGrid, cam *Camera, img *SpriteImage, mirrorX bool) int {
 	carved := 0
-	imgWidth := float64(img.Width() - 1)
+	imgWidth := float64(img.Width())
 
 	for ix := 0; ix < grid.Resolution; ix++ {
 		for iy := 0; iy < grid.Resolution; iy++ {
@@ -101,7 +101,7 @@ func SampleColors(grid *VoxelGrid, cameras []*Camera, images []*SpriteImage, sym
 				for _, v := range views {
 					projX, projY := v.cam.Project(pos)
 					if v.mirrorX {
-						projX = float64(v.img.Width()-1) - projX
+						projX = float64(v.img.Width()) - projX
 					}
 
 					if v.img.InBounds(projX, projY) && v.img.ContainsFloat(projX, projY) {
