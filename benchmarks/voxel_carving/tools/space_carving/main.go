@@ -23,6 +23,8 @@ func main() {
 	alphaThreshold := flag.Float64("alpha", 0.5, "Alpha threshold")
 	symmetry := flag.Bool("symmetry", false, "Enable Y-axis mirror symmetry")
 	mesh := flag.Bool("mesh", false, "Export as mesh with cube faces (instead of point cloud)")
+	render := flag.Bool("render", false, "Render comparison images for each view")
+	renderDir := flag.String("renderdir", "renders", "Output directory for rendered images")
 	flag.Parse()
 
 	fmt.Printf("Loading sprites from %s...\n", *jsonPath)
@@ -78,6 +80,13 @@ func main() {
 	}
 	if err != nil {
 		fatalf("Error exporting PLY: %v", err)
+	}
+
+	if *render {
+		err = RenderAllViews(coloredPoints, cameras, sprites, grid.VoxelSize(), *imagesDir, *renderDir)
+		if err != nil {
+			fatalf("Error rendering views: %v", err)
+		}
 	}
 
 	fmt.Println("Done!")
