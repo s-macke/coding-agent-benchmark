@@ -64,3 +64,31 @@ class Cameras:
     def is_perspective(self) -> bool:
         """True if using perspective projection."""
         return self.camera_model == "pinhole"
+
+    def with_resolution(self, width: int, height: int) -> 'Cameras':
+        """Return a copy with different resolution, scaling intrinsics.
+
+        Args:
+            width: new image width in pixels
+            height: new image height in pixels
+
+        Returns:
+            New Cameras object with scaled intrinsics
+        """
+        scale_x = width / self.width
+        scale_y = height / self.height
+
+        # Scale intrinsic matrices: fx, cx scale with width; fy, cy scale with height
+        new_Ks = self.Ks.clone()
+        new_Ks[:, 0, 0] *= scale_x  # fx
+        new_Ks[:, 0, 2] *= scale_x  # cx
+        new_Ks[:, 1, 1] *= scale_y  # fy
+        new_Ks[:, 1, 2] *= scale_y  # cy
+
+        return Cameras(
+            viewmats=self.viewmats,
+            Ks=new_Ks,
+            camera_model=self.camera_model,
+            width=width,
+            height=height,
+        )

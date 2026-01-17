@@ -19,8 +19,10 @@ Options:
 
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+from PIL import Image
 
 from .cameras import Cameras
 from .constants import SPRITES_JSON, SPRITES_DIR
@@ -28,7 +30,7 @@ from .device import get_device
 from .gaussians import Gaussians, export_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule
-from .render import render_gaussians_simple, render_gsplat
+from .render import render_gaussians, render_gaussians_simple, render_gsplat
 from .train_args import TrainConfig, parse_args
 from .voxel_carving import initialize_from_visual_hull
 
@@ -219,6 +221,24 @@ def main() -> None:
     output_path = project_dir / args.output
     print(f"Exporting to {output_path}...")
     export_ply(gaussians, str(output_path))
+
+    if args.render:
+        print("Rendering all views at 512x512...")
+        render_dir = project_dir / args.render_dir
+        render_dir.mkdir(exist_ok=True)
+
+        device = get_device(args.train.device)
+        render_cams = cameras.to_cameras().with_resolution(512, 512).to(device)
+        gaussians = gaussians.to(device)
+
+        num_views = len(render_cams)
+        for i in range(num_views):
+            print(f"  Rendering view {i + 1}/{num_views}...", end='\r')
+            rgb, alpha = render_gaussians(gaussians, render_cams[i])
+            rgb = rgb * alpha  # composite over black
+            img = (rgb.cpu().numpy() * 255).clip(0, 255).astype(np.uint8)
+            Image.fromarray(img).save(render_dir / f"view_{i:02d}.png")
+        print(f"\n  Saved {num_views} images to {render_dir}")
 
     print("Done!")
 

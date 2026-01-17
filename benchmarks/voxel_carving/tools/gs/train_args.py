@@ -26,6 +26,8 @@ class TrainingArgs:
     ortho_scale: float
     fov: float
     distance: float
+    render: bool
+    render_dir: str
     train: TrainConfig
 
 
@@ -50,6 +52,10 @@ def parse_args() -> TrainingArgs:
                         help='Enable camera pose optimization during training')
     parser.add_argument('--fix-positions', action='store_true',
                         help='Keep Gaussian positions fixed during training')
+    parser.add_argument('--render', action='store_true',
+                        help='Render all views after training')
+    parser.add_argument('--render-dir', default='renders',
+                        help='Output directory for rendered images')
     args = parser.parse_args()
 
     return TrainingArgs(
@@ -60,6 +66,8 @@ def parse_args() -> TrainingArgs:
         ortho_scale=args.ortho_scale,
         fov=args.fov,
         distance=args.distance,
+        render=args.render,
+        render_dir=args.render_dir,
         train=TrainConfig(
             num_iterations=args.iterations,
             lr=args.lr,
