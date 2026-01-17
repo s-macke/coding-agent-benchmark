@@ -3,6 +3,12 @@
 from .constants import IMAGE_SIZE, SH_C0, ALPHA_THRESHOLD
 from .sprites import load_sprites
 from .camera import (
+    # Classes
+    Camera,
+    OrthographicCamera,
+    PerspectiveCamera,
+    CameraCollection,
+    # Backwards-compatible functions
     build_cameras,
     build_view_matrix,
     build_orthographic_K,
@@ -18,7 +24,12 @@ __all__ = [
     'ALPHA_THRESHOLD',
     # Sprites
     'load_sprites',
-    # Camera
+    # Camera classes
+    'Camera',
+    'OrthographicCamera',
+    'PerspectiveCamera',
+    'CameraCollection',
+    # Camera functions (backwards compatible)
     'build_cameras',
     'build_view_matrix',
     'build_orthographic_K',

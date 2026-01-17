@@ -24,7 +24,7 @@ import torch.nn.functional as F
 
 from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SH_C0
 from .sprites import load_sprites
-from .camera import build_cameras, project_points_orthographic
+from .camera import CameraCollection
 from .render import render_gaussians_simple, try_gsplat_render
 
 # Gaussian initialization constants
@@ -45,12 +45,11 @@ CLAMP_EPSILON = 1e-6
 
 
 def carve_visual_hull(images: List[torch.Tensor],
-                      viewmats: torch.Tensor,
-                      Ks: torch.Tensor,
+                      cameras: CameraCollection,
                       resolution: int = 64,
                       extent: float = 1.5) -> torch.Tensor:
     """
-    Carve visual hull from silhouettes using orthographic projection.
+    Carve visual hull from silhouettes using camera projection.
 
     Returns:
         points: [N, 3] 3D points inside visual hull
@@ -61,13 +60,13 @@ def carve_visual_hull(images: List[torch.Tensor],
 
     occupied = torch.ones(grid.shape[0], dtype=torch.bool)
 
-    print(f"  Carving with {len(images)} views...")
+    print(f"  Carving with {len(cameras)} views...")
 
-    for img, viewmat, K in zip(images, viewmats, Ks):
+    for img, camera in zip(images, cameras):
         mask = img[:, :, 3] > ALPHA_THRESHOLD
         H, W = mask.shape
 
-        proj_x, proj_y = project_points_orthographic(grid, viewmat, K)
+        proj_x, proj_y = camera.project(grid)
 
         in_bounds = (proj_x >= 0) & (proj_x < W - 1) & (proj_y >= 0) & (proj_y < H - 1)
 
@@ -87,8 +86,7 @@ def carve_visual_hull(images: List[torch.Tensor],
 
 def init_gaussians(points: torch.Tensor,
                    images: List[torch.Tensor],
-                   viewmats: torch.Tensor,
-                   Ks: torch.Tensor,
+                   cameras: CameraCollection,
                    num_gaussians: int = 5000) -> Tuple[torch.Tensor, ...]:
     """
     Initialize Gaussian parameters from point cloud.
@@ -120,8 +118,8 @@ def init_gaussians(points: torch.Tensor,
     colors = torch.full((N, 3), 0.5, dtype=torch.float32)
     color_counts = torch.zeros(N, dtype=torch.float32)
 
-    for img, viewmat, K in zip(images, viewmats, Ks):
-        proj_x, proj_y = project_points_orthographic(means, viewmat, K)
+    for img, camera in zip(images, cameras):
+        proj_x, proj_y = camera.project(means)
 
         H, W = img.shape[:2]
         in_bounds = (proj_x >= 0) & (proj_x < W - 1) & (proj_y >= 0) & (proj_y < H - 1)
@@ -144,8 +142,7 @@ def init_gaussians(points: torch.Tensor,
 
 
 def train_gaussians(images: List[torch.Tensor],
-                    viewmats: torch.Tensor,
-                    Ks: torch.Tensor,
+                    cameras: CameraCollection,
                     init_means: torch.Tensor,
                     init_scales: torch.Tensor,
                     init_quats: torch.Tensor,
@@ -165,8 +162,9 @@ def train_gaussians(images: List[torch.Tensor],
     target_rgb = targets[:, :, :, :3]
     target_alpha = targets[:, :, :, 3:4]
 
-    viewmats = viewmats.to(device)
-    Ks = Ks.to(device)
+    # Get stacked tensors for batch rendering
+    viewmats = cameras.viewmats.to(device)
+    Ks = cameras.Ks.to(device)
 
     means = init_means.clone().to(device).requires_grad_(True)
     scales = init_scales.clone().to(device).requires_grad_(True)
@@ -324,22 +322,22 @@ def main() -> None:
     )
     print(f"  Loaded {len(images)} sprites")
 
-    print("Building camera matrices...")
-    viewmats, Ks = build_cameras(metadata, ortho_scale=args.ortho_scale)
-    print(f"  Built {viewmats.shape[0]} view matrices")
+    print("Building cameras...")
+    cameras = CameraCollection.from_metadata(metadata, ortho_scale=args.ortho_scale)
+    print(f"  Built {len(cameras)} cameras")
 
     print("Carving visual hull...")
-    points = carve_visual_hull(images, viewmats, Ks, resolution=args.resolution)
+    points = carve_visual_hull(images, cameras, resolution=args.resolution)
 
     print("Initializing Gaussians...")
     means, scales, quats, opacities, colors = init_gaussians(
-        points, images, viewmats, Ks, num_gaussians=args.num_gaussians
+        points, images, cameras, num_gaussians=args.num_gaussians
     )
     print(f"  Initialized {means.shape[0]} Gaussians")
 
     print(f"Training for {args.iterations} iterations...")
     means, scales, quats, opacities, colors = train_gaussians(
-        images, viewmats, Ks,
+        images, cameras,
         means, scales, quats, opacities, colors,
         num_iterations=args.iterations,
         lr=args.lr,

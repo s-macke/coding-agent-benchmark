@@ -7,8 +7,11 @@ rm -f renders/*.png
   -resolution 128                 \
   -min-votes 1                    \
   -extent 2.                      \
-  -perspective -fov 60 -distance 5.0      \
-  -mesh -render -symmetry
+  -camera perspective             \
+  -fov 60 -distance 5.0           \
+  -mesh -render -symmetry         \
+  -cardinal                       \
+  -vox
 
 # -cardinal
 

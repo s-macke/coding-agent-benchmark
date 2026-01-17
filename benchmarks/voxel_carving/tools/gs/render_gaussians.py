@@ -22,7 +22,7 @@ import torch
 
 from .constants import IMAGE_SIZE, SH_C0
 from .sprites import load_sprites
-from .camera import build_cameras
+from .camera import CameraCollection
 from .render import try_gsplat_render
 
 
@@ -151,8 +151,7 @@ def render_all_views(
     quats: torch.Tensor,
     opacities: torch.Tensor,
     colors: torch.Tensor,
-    viewmats: torch.Tensor,
-    Ks: torch.Tensor,
+    cameras: CameraCollection,
     device: str = 'cuda',
 ) -> List[torch.Tensor]:
     """Render gaussian splats from all camera angles."""
@@ -167,8 +166,10 @@ def render_all_views(
     quats = quats.to(device)
     opacities = opacities.to(device)
     colors = colors.to(device)
-    viewmats = viewmats.to(device)
-    Ks = Ks.to(device)
+
+    # Get stacked tensors for batch rendering
+    viewmats = cameras.viewmats.to(device)
+    Ks = cameras.Ks.to(device)
 
     # Check if gsplat works
     gsplat_result = try_gsplat_render(
@@ -183,7 +184,7 @@ def render_all_views(
         print("  Using fast point renderer (gsplat not available)")
 
     renders = []
-    num_views = viewmats.shape[0]
+    num_views = len(cameras)
 
     if use_gsplat:
         # Render all views at once with gsplat
@@ -201,11 +202,13 @@ def render_all_views(
 
     if not use_gsplat:
         # Use fast point renderer
-        for i in range(num_views):
+        for i, camera in enumerate(cameras):
             print(f"  Rendering view {i + 1}/{num_views}...", end='\r')
+            viewmat = camera.viewmat.to(device)
+            K = camera.K.to(device)
             rgb, alpha = render_points_fast(
                 means, opacities, colors,
-                viewmats[i], Ks[i], IMAGE_SIZE, IMAGE_SIZE
+                viewmat, K, IMAGE_SIZE, IMAGE_SIZE
             )
             rgba = torch.cat([rgb, alpha], dim=-1)
             renders.append(rgba.cpu())
@@ -282,15 +285,16 @@ def main() -> None:
     )
     print(f"  Loaded {len(images)} sprites")
 
-    # Build camera matrices
-    print("Building camera matrices...")
-    viewmats, Ks = build_cameras(metadata, ortho_scale=args.ortho_scale)
+    # Build cameras
+    print("Building cameras...")
+    cameras = CameraCollection.from_metadata(metadata, ortho_scale=args.ortho_scale)
+    print(f"  Built {len(cameras)} cameras")
 
     # Render all views
     print("Rendering gaussian splats...")
     renders = render_all_views(
         means, scales, quats, opacities, colors,
-        viewmats, Ks, device=args.device
+        cameras, device=args.device
     )
 
     # Create comparison grid

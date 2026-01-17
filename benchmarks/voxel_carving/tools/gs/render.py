@@ -90,6 +90,10 @@ def try_gsplat_render(means, scales, quats, opacities, colors,
     Returns:
         (render_colors, render_alphas) if successful, None otherwise
     """
+    import os
+    if os.environ.get('SKIP_GSPLAT', '').lower() in ('1', 'true', 'yes'):
+        return None
+
     try:
         import gsplat
 
