@@ -30,8 +30,9 @@ from .device import get_device
 from .gaussians import Gaussians, export_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule
+from .losses import ssim
 from .render import render_gaussians, render_gaussians_simple, render_gsplat
-from .train_args import TrainConfig, parse_args
+from .train_args import LossType, TrainConfig, parse_args
 from .voxel_carving import initialize_from_visual_hull
 
 # Training constants
@@ -130,6 +131,7 @@ def train_gaussians(
 
     print(f"  Using {'gsplat' if use_gsplat else 'simple'} renderer "
           f"(SH degree {sh_degree}){'' if use_gsplat else ' (slower)'}")
+    print(f"  Loss type: {config.loss_type.value}")
 
     for iteration in range(config.num_iterations):
         optimizer.zero_grad()
@@ -158,7 +160,20 @@ def train_gaussians(
         else:
             render_colors, render_alphas = render_gaussians_simple(current_gaussians, current_cams)
 
-        rgb_loss = (torch.abs(render_colors - target_rgb) * target_alpha).mean()
+        # L1 loss (masked by alpha)
+        l1_loss = (torch.abs(render_colors - target_rgb) * target_alpha).mean()
+
+        if config.loss_type == LossType.L1_SSIM:
+            # SSIM loss on RGB (permute to [N,C,H,W] for conv2d)
+            render_rgb_nchw = render_colors.permute(0, 3, 1, 2)
+            target_rgb_nchw = target_rgb.permute(0, 3, 1, 2)
+            ssim_val = ssim(render_rgb_nchw, target_rgb_nchw)
+            ssim_loss = 1 - ssim_val
+            # Combined RGB loss (0.8 * L1 + 0.2 * SSIM, standard 3DGS weights)
+            rgb_loss = 0.8 * l1_loss + 0.2 * ssim_loss
+        else:
+            ssim_val = torch.tensor(0.0, device=l1_loss.device)
+            rgb_loss = l1_loss
 
         alpha_loss = F.binary_cross_entropy(
             render_alphas.clamp(CLAMP_EPSILON, 1 - CLAMP_EPSILON),
@@ -179,8 +194,11 @@ def train_gaussians(
             quats.data = F.normalize(quats.data, dim=-1)
 
         if iteration % LOG_INTERVAL == 0 or iteration == config.num_iterations - 1:
-            print(f"  Iter {iteration}: loss={loss.item():.4f}, "
-                  f"rgb={rgb_loss.item():.4f}, alpha={alpha_loss.item():.4f}")
+            log_msg = (f"  Iter {iteration}: loss={loss.item():.4f}, "
+                       f"rgb={rgb_loss.item():.4f}, alpha={alpha_loss.item():.4f}")
+            if config.loss_type == LossType.L1_SSIM:
+                log_msg += f", ssim={ssim_val.item():.4f}"
+            print(log_msg)
 
     # Reconstruct full SH coefficients
     sh_coeffs_out = torch.cat([sh0, shN], dim=1)

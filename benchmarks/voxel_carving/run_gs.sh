@@ -12,6 +12,7 @@ python3 -m tools.gs.sprite_to_3dgs  \
   --iterations 2000                 \
   --resolution 128                  \
   --num-gaussians 10000             \
+  --loss-type l1_ssim               \
   --camera-type ${CAMERA}           \
   --fov ${FOV}                      \
   --distance ${DISTANCE}            \

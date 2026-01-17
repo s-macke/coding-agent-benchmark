@@ -2,8 +2,15 @@
 
 import argparse
 from dataclasses import dataclass
+from enum import Enum
 
 from .camera import CameraType
+
+
+class LossType(str, Enum):
+    """Loss function type for training."""
+    L1 = "l1"
+    L1_SSIM = "l1_ssim"
 
 
 @dataclass
@@ -14,6 +21,7 @@ class TrainConfig:
     device: str = 'cuda'
     pose_opt: bool = False
     fix_positions: bool = False
+    loss_type: LossType = LossType.L1_SSIM
 
 
 @dataclass
@@ -52,6 +60,8 @@ def parse_args() -> TrainingArgs:
                         help='Enable camera pose optimization during training')
     parser.add_argument('--fix-positions', action='store_true',
                         help='Keep Gaussian positions fixed during training')
+    parser.add_argument('--loss-type', choices=['l1', 'l1_ssim'], default='l1_ssim',
+                        help='Loss function type (l1=L1 only, l1_ssim=L1+SSIM)')
     parser.add_argument('--render', action='store_true',
                         help='Render all views after training')
     parser.add_argument('--render-dir', default='renders',
@@ -74,5 +84,6 @@ def parse_args() -> TrainingArgs:
             device=args.device,
             pose_opt=args.pose_opt,
             fix_positions=args.fix_positions,
+            loss_type=LossType(args.loss_type),
         ),
     )
