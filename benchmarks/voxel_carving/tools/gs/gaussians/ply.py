@@ -74,9 +74,9 @@ def load_ply(path: str, sh_degree: int = SH_DEGREE) -> Gaussians:
 
             opacities[i] = data[offset]
             scales[i] = data[offset + 1:offset + 4]
-            # Convert quaternion from xyzw (file) to wxyz (internal)
-            quats[i] = [data[offset + 7], data[offset + 4],
-                        data[offset + 5], data[offset + 6]]
+            # Quaternion is stored as wxyz in standard 3DGS PLY format
+            quats[i] = [data[offset + 4], data[offset + 5],
+                        data[offset + 6], data[offset + 7]]
 
     # Build SH coefficient tensor
     target_coeffs = (sh_degree + 1) ** 2
@@ -184,8 +184,7 @@ def export_ply(gaussians: Gaussians, output_path: str) -> None:
             # Scales
             f.write(struct.pack('<fff', *scales_np[i]))
 
-            # Quaternion (wxyz -> xyzw for file)
-            q = quats_np[i]
-            f.write(struct.pack('<ffff', q[1], q[2], q[3], q[0]))
+            # Quaternion stored as wxyz in standard 3DGS PLY format
+            f.write(struct.pack('<ffff', *quats_np[i]))
 
     print(f"Saved {n} Gaussians ({num_sh_coeffs} SH coefficients) to {output_path}")
