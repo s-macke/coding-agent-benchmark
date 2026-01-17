@@ -6,6 +6,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+
+	"voxelcarve/camera"
 )
 
 func fatalf(format string, args ...interface{}) {
@@ -90,7 +92,7 @@ func main() {
 		projType = fmt.Sprintf("perspective (FOV=%.1f°)", *fov)
 	}
 	fmt.Printf("Loading images and building cameras (%s)...\n", projType)
-	cameras := make([]Camera, len(sprites))
+	cameras := make([]camera.Camera, len(sprites))
 	images := make([]*SpriteImage, len(sprites))
 
 	for i, sprite := range sprites {
@@ -103,7 +105,7 @@ func main() {
 		images[i] = img
 
 		if *cameraType == "perspective" {
-			cameras[i] = NewPerspectiveCamera(
+			cameras[i] = camera.NewPerspectiveCamera(
 				sprite.Yaw,
 				sprite.Pitch,
 				sprite.CameraUpVec(),
@@ -114,7 +116,7 @@ func main() {
 				*distance,
 			)
 		} else {
-			cameras[i] = NewOrthographicCamera(
+			cameras[i] = camera.NewOrthographicCamera(
 				sprite.Yaw,
 				sprite.Pitch,
 				sprite.CameraUpVec(),

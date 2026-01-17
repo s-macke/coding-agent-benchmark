@@ -9,10 +9,12 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+
+	"voxelcarve/camera"
 )
 
 // RenderView renders the voxel model from a single camera viewpoint using Z-buffer.
-func RenderView(grid *VoxelGrid, cam Camera) *image.RGBA {
+func RenderView(grid *VoxelGrid, cam camera.Camera) *image.RGBA {
 	base := cam.Base()
 	width, height := base.Width, base.Height
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
@@ -146,7 +148,7 @@ func SavePNG(img image.Image, path string) error {
 }
 
 // RenderAllViews renders comparison images for all camera views.
-func RenderAllViews(grid *VoxelGrid, cameras []Camera,
+func RenderAllViews(grid *VoxelGrid, cameras []camera.Camera,
 	sprites []Sprite, imagesDir, outputDir string) error {
 
 	// Create output directory
