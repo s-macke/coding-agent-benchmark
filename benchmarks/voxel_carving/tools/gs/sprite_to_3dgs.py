@@ -27,7 +27,7 @@ import torch.nn.functional as F
 from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SPRITES_JSON, SPRITES_DIR, SH_DEGREE
 from .ply import export_ply
 from .sprites import load_sprites
-from .camera import CameraCollection
+from .camera import CameraCollection, CameraOptModule
 from .render import render_gaussians_simple, try_gsplat_render
 from .sh import init_sh_from_rgb
 
@@ -45,6 +45,10 @@ ALPHA_LOSS_WEIGHT = 0.5
 OPACITY_REG_WEIGHT = 0.01
 LOG_INTERVAL = 500
 MAX_VIEWS_PER_ITERATION = 8
+
+# Camera pose optimization constants
+POSE_OPT_LR = 1e-5  # Base learning rate for pose optimization
+POSE_OPT_WEIGHT_DECAY = 1e-6  # Regularization for pose parameters
 
 # Rendering constants
 CLAMP_EPSILON = 1e-6
@@ -173,6 +177,8 @@ def train_gaussians(
     lr: float = 0.01,
     sh_degree: int = SH_DEGREE,
     device: str = 'cuda',
+    pose_opt: bool = False,
+    fix_positions: bool = False,
 ) -> Tuple[torch.Tensor, ...]:
     """
     Optimize Gaussian parameters to match target sprite views.
@@ -186,6 +192,8 @@ def train_gaussians(
         lr: base learning rate
         sh_degree: SH degree for rendering
         device: cuda or cpu
+        pose_opt: if True, also optimize camera poses
+        fix_positions: if True, keep Gaussian positions fixed
 
     Returns:
         Optimized (means, scales, quats, opacities, sh_coeffs)
@@ -204,7 +212,9 @@ def train_gaussians(
     viewmats = cameras.viewmats.to(device)
     intrinsics = cameras.Ks.to(device)
 
-    means = init_means.clone().to(device).requires_grad_(True)
+    means = init_means.clone().to(device)
+    if not fix_positions:
+        means.requires_grad_(True)
     scales = init_scales.clone().to(device).requires_grad_(True)
     quats = init_quats.clone().to(device).requires_grad_(True)
     opacities = init_opacities.clone().to(device).requires_grad_(True)
@@ -214,16 +224,36 @@ def train_gaussians(
     sh0 = sh_coeffs[:, :1, :].clone().requires_grad_(True)  # [N, 1, 3]
     shN = sh_coeffs[:, 1:, :].clone().requires_grad_(True)  # [N, K-1, 3]
 
-    optimizer = torch.optim.Adam([
-        {'params': means, 'lr': lr},
+    # Build optimizer param groups
+    param_groups = [
         {'params': scales, 'lr': lr * SCALE_LR_MULTIPLIER},
         {'params': quats, 'lr': lr * QUAT_LR_MULTIPLIER},
         {'params': opacities, 'lr': lr * OPACITY_LR_MULTIPLIER},
         {'params': sh0, 'lr': lr * SH0_LR_MULTIPLIER},
         {'params': shN, 'lr': lr * SHN_LR_MULTIPLIER},
-    ])
+    ]
+    if not fix_positions:
+        param_groups.insert(0, {'params': means, 'lr': lr})
+    else:
+        print("  Gaussian positions fixed")
+
+    optimizer = torch.optim.Adam(param_groups)
 
     num_views = viewmats.shape[0]
+
+    # Setup camera pose optimization if enabled
+    pose_adjust = None
+    pose_optimizer = None
+    if pose_opt:
+        import math
+        pose_adjust = CameraOptModule(num_views).to(device)
+        pose_adjust.zero_init()
+        pose_optimizer = torch.optim.Adam(
+            pose_adjust.parameters(),
+            lr=POSE_OPT_LR * math.sqrt(num_views),
+            weight_decay=POSE_OPT_WEIGHT_DECAY,
+        )
+        print(f"  Camera pose optimization enabled ({num_views} cameras)")
 
     # Test if gsplat works
     sh_full = torch.cat([sh0, shN], dim=1)
@@ -239,14 +269,22 @@ def train_gaussians(
 
     for iteration in range(num_iterations):
         optimizer.zero_grad()
+        if pose_optimizer is not None:
+            pose_optimizer.zero_grad()
 
         # Concatenate SH coefficients
         sh_full = torch.cat([sh0, shN], dim=1)
 
         if use_gsplat:
+            # Apply pose adjustment if enabled
+            current_viewmats = viewmats
+            if pose_adjust is not None:
+                camera_ids = torch.arange(num_views, device=device)
+                current_viewmats = pose_adjust.forward_viewmats(viewmats, camera_ids)
+
             result = try_gsplat_render(
                 means, scales, quats, opacities, sh_full,
-                viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE, device,
+                current_viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE, device,
                 sh_degree=sh_degree,
             )
             if result is None:
@@ -262,9 +300,17 @@ def train_gaussians(
             render_alphas_list = []
 
             for vi in view_indices:
+                # Apply pose adjustment if enabled
+                current_viewmat = viewmats[vi]
+                if pose_adjust is not None:
+                    camera_id = torch.tensor(vi.item(), device=device)
+                    current_viewmat = pose_adjust.forward_viewmats(
+                        viewmats[vi].unsqueeze(0), camera_id.unsqueeze(0)
+                    ).squeeze(0)
+
                 rc, ra = render_gaussians_simple(
                     means, scales, quats, opacities, sh_full,
-                    viewmats[vi], intrinsics[vi], IMAGE_SIZE, IMAGE_SIZE,
+                    current_viewmat, intrinsics[vi], IMAGE_SIZE, IMAGE_SIZE,
                     sh_degree=sh_degree,
                 )
                 render_colors_list.append(rc)
@@ -289,6 +335,8 @@ def train_gaussians(
 
         loss.backward()
         optimizer.step()
+        if pose_optimizer is not None:
+            pose_optimizer.step()
 
         with torch.no_grad():
             quats.data = F.normalize(quats.data, dim=-1)
@@ -318,6 +366,10 @@ def main() -> None:
                         help='Orthographic scale (only for orthographic camera)')
     parser.add_argument('--fov', type=float, default=60.0,
                         help='Field of view in degrees (only for perspective camera)')
+    parser.add_argument('--pose-opt', action='store_true',
+                        help='Enable camera pose optimization during training')
+    parser.add_argument('--fix-positions', action='store_true',
+                        help='Keep Gaussian positions fixed during training')
     args = parser.parse_args()
 
     project_dir = Path(__file__).parent.parent.parent
@@ -354,6 +406,8 @@ def main() -> None:
         num_iterations=args.iterations,
         lr=args.lr,
         device=args.device,
+        pose_opt=args.pose_opt,
+        fix_positions=args.fix_positions,
     )
 
     output_path = project_dir / args.output

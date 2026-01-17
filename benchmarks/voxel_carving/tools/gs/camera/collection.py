@@ -27,6 +27,7 @@ class CameraCollection:
         """
         self._cameras = cameras
         self._viewmats: Optional[torch.Tensor] = None
+        self._camtoworlds: Optional[torch.Tensor] = None
         self._Ks: Optional[torch.Tensor] = None
 
     def __len__(self) -> int:
@@ -43,10 +44,17 @@ class CameraCollection:
 
     @property
     def viewmats(self) -> torch.Tensor:
-        """[C, 4, 4] stacked view matrices."""
+        """[C, 4, 4] stacked view matrices (world-to-camera)."""
         if self._viewmats is None:
             self._viewmats = torch.stack([c.viewmat for c in self._cameras])
         return self._viewmats
+
+    @property
+    def camtoworlds(self) -> torch.Tensor:
+        """[C, 4, 4] stacked camera-to-world matrices (inverse of viewmats)."""
+        if self._camtoworlds is None:
+            self._camtoworlds = torch.linalg.inv(self.viewmats)
+        return self._camtoworlds
 
     @property
     def Ks(self) -> torch.Tensor:

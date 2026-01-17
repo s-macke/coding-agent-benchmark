@@ -22,6 +22,7 @@ from .base import Camera, compute_camera_position
 from .orthographic import OrthographicCamera
 from .perspective import PerspectiveCamera
 from .collection import CameraCollection, CameraType
+from .pose_opt import CameraOptModule, rotation_6d_to_matrix
 
 __all__ = [
     "Camera",
@@ -30,4 +31,6 @@ __all__ = [
     "CameraCollection",
     "CameraType",
     "compute_camera_position",
+    "CameraOptModule",
+    "rotation_6d_to_matrix",
 ]

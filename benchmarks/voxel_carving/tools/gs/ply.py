@@ -87,9 +87,11 @@ def load_ply(path: str, sh_degree: int = SH_DEGREE) -> Tuple[torch.Tensor, ...]:
     target_coeffs = (sh_degree + 1) ** 2
 
     if has_full_sh:
-        # Reshape f_rest from interleaved to [N, K-1, 3]
-        # File stores: f_rest_0 (coeff1 R), f_rest_1 (coeff1 G), f_rest_2 (coeff1 B), ...
-        sh_rest_reshaped = sh_rest.reshape(num_vertices, -1, 3)
+        # Reshape f_rest from channel-grouped to [N, K-1, 3]
+        # File stores: f_rest_0-7 (all R), f_rest_8-15 (all G), f_rest_16-23 (all B)
+        num_coeffs_per_channel = num_f_rest // 3
+        sh_rest_reshaped = sh_rest.reshape(num_vertices, 3, num_coeffs_per_channel)
+        sh_rest_reshaped = sh_rest_reshaped.transpose(0, 2, 1)  # [N, 3, K-1] -> [N, K-1, 3]
         all_sh = np.concatenate([sh_dc[:, np.newaxis, :], sh_rest_reshaped], axis=1)
 
         # Truncate or pad to target degree
@@ -185,10 +187,11 @@ def export_ply(
             # SH DC (f_dc_0, f_dc_1, f_dc_2)
             f.write(struct.pack('<fff', *sh_np[i, 0]))
 
-            # SH rest (f_rest_0, f_rest_1, ... interleaved by channel)
+            # SH rest (f_rest_0, f_rest_1, ... grouped by channel)
+            # Standard format: all R coeffs, then all G coeffs, then all B coeffs
             if num_sh_coeffs > 1:
-                # Flatten [K-1, 3] to interleaved format
-                sh_rest = sh_np[i, 1:].flatten()  # [coeff1_R, coeff1_G, coeff1_B, ...]
+                # Transpose [K-1, 3] to [3, K-1] then flatten
+                sh_rest = sh_np[i, 1:].T.flatten()  # [R1,R2,...,G1,G2,...,B1,B2,...]
                 f.write(struct.pack(f'<{num_f_rest}f', *sh_rest))
 
             # Opacity
