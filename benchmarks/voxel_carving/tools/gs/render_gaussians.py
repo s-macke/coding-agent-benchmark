@@ -27,8 +27,7 @@ from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR
 from .device import get_device
 from .gaussians import Gaussians
 from .ply import load_ply
-from .sprites import load_sprites
-from .camera import CameraCollection
+from .sprites import load_cameras
 from .render import try_gsplat_render
 from .sh import eval_sh
 
@@ -239,23 +238,16 @@ def main() -> None:
     gaussians = load_ply(str(ply_path))
     print(f"  Loaded {gaussians.num_gaussians} gaussians ({gaussians.sh_coeffs.shape[1]} SH coefficients)")
 
-    # Load original sprites and camera data
-    print("Loading sprites and camera data...")
-    images, metadata = load_sprites(
+    # Load sprites and build cameras
+    print("Loading sprites and cameras...")
+    cameras = load_cameras(
         project_dir / SPRITES_JSON,
-        project_dir / SPRITES_DIR
-    )
-    print(f"  Loaded {len(images)} sprites")
-
-    # Build cameras
-    print(f"Building {args.camera_type} cameras...")
-    cameras = CameraCollection.from_metadata(
-        metadata,
+        project_dir / SPRITES_DIR,
         camera_type=args.camera_type,
         ortho_scale=args.ortho_scale,
         fov_deg=args.fov,
     )
-    print(f"  Built {len(cameras)} cameras")
+    print(f"  Loaded {len(cameras)} cameras")
 
     # Render all views
     print("Rendering gaussian splats...")
@@ -264,7 +256,7 @@ def main() -> None:
     # Create comparison grid
     output_path = project_dir / args.output
     print(f"Creating comparison grid...")
-    create_comparison_grid(images, renders, str(output_path))
+    create_comparison_grid(cameras.images, renders, str(output_path))
 
     print("Done!")
 

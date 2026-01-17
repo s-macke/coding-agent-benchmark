@@ -140,7 +140,6 @@ def init_gaussians(
 
 
 def initialize_from_visual_hull(
-    images: List[torch.Tensor],
     cameras: CameraCollection,
     resolution: int = 64,
     extent: float = 1.5,
@@ -153,8 +152,7 @@ def initialize_from_visual_hull(
     Combines carve_visual_hull() and init_gaussians() into one step.
 
     Args:
-        images: list of [H, W, 4] RGBA images
-        cameras: camera collection with projection methods
+        cameras: camera collection with images and projection methods
         resolution: voxel grid resolution per axis
         extent: half-size of the voxel grid in world units
         num_gaussians: maximum number of Gaussians
@@ -163,6 +161,8 @@ def initialize_from_visual_hull(
     Returns:
         Gaussians object initialized from visual hull points
     """
+    images = cameras.images
+
     print("Carving visual hull...")
     points = carve_visual_hull(images, cameras, resolution, extent)
 

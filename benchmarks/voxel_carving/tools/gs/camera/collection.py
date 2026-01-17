@@ -1,6 +1,6 @@
 """Camera collection for batch operations."""
 
-from typing import Iterator, List, Literal, Optional, Tuple
+from typing import Iterator, List, Literal, Optional, Tuple, TYPE_CHECKING
 
 import torch
 
@@ -8,6 +8,9 @@ from .base import Camera
 from .orthographic import OrthographicCamera
 from .perspective import PerspectiveCamera
 from ..constants import IMAGE_SIZE
+
+if TYPE_CHECKING:
+    from ..sprites import SpriteData
 
 CameraType = Literal["orthographic", "perspective"]
 
@@ -63,6 +66,11 @@ class CameraCollection:
             self._Ks = torch.stack([c.K for c in self._cameras])
         return self._Ks
 
+    @property
+    def images(self) -> List[torch.Tensor]:
+        """List of [H, W, 4] RGBA tensors (float32, 0-1)."""
+        return [c.image_tensor for c in self._cameras]
+
     def to_tensors(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Return (viewmats, Ks) tuple for backwards compatibility.
 
@@ -93,9 +101,9 @@ class CameraCollection:
         )
 
     @classmethod
-    def from_metadata(
+    def from_sprites(
         cls,
-        metadata: List[dict],
+        sprites: "List[SpriteData]",
         camera_type: CameraType = "orthographic",
         ortho_scale: float = 2.0,
         fov_deg: float = 60.0,
@@ -105,11 +113,10 @@ class CameraCollection:
         width: int = IMAGE_SIZE,
         height: int = IMAGE_SIZE,
     ) -> "CameraCollection":
-        """Build camera collection from sprite metadata.
+        """Build camera collection from sprite data.
 
         Args:
-            metadata: list of sprite metadata dicts with yaw, pitch,
-                     camera_up, and camera_right fields
+            sprites: list of SpriteData objects with camera params and images
             camera_type: "orthographic" or "perspective"
             ortho_scale: (orthographic only) world units visible in half the image
             fov_deg: (perspective only) vertical field of view in degrees
@@ -123,13 +130,14 @@ class CameraCollection:
             CameraCollection with camera instances of the specified type
         """
         cameras = []
-        for sprite in metadata:
+        for sprite in sprites:
             if camera_type == "orthographic":
                 camera = OrthographicCamera.from_angles(
-                    yaw_deg=sprite["yaw"],
-                    pitch_deg=sprite["pitch"],
-                    camera_up=sprite["camera_up"],
-                    camera_right=sprite["camera_right"],
+                    yaw_deg=sprite.yaw,
+                    pitch_deg=sprite.pitch,
+                    camera_up=sprite.camera_up,
+                    camera_right=sprite.camera_right,
+                    image=sprite.image,
                     distance=distance,
                     width=width,
                     height=height,
@@ -137,10 +145,11 @@ class CameraCollection:
                 )
             elif camera_type == "perspective":
                 camera = PerspectiveCamera.from_angles(
-                    yaw_deg=sprite["yaw"],
-                    pitch_deg=sprite["pitch"],
-                    camera_up=sprite["camera_up"],
-                    camera_right=sprite["camera_right"],
+                    yaw_deg=sprite.yaw,
+                    pitch_deg=sprite.pitch,
+                    camera_up=sprite.camera_up,
+                    camera_right=sprite.camera_right,
+                    image=sprite.image,
                     distance=distance,
                     width=width,
                     height=height,

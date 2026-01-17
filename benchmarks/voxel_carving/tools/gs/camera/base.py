@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 import torch
+from PIL import Image
 
 
 class Camera(ABC):
@@ -21,8 +22,9 @@ class Camera(ABC):
         camera_right: np.ndarray,
         width: int,
         height: int,
+        image: Image.Image,
     ):
-        """Initialize camera with position and orientation.
+        """Initialize camera with position, orientation, and image.
 
         Args:
             position: [3,] camera position in world coordinates
@@ -30,16 +32,19 @@ class Camera(ABC):
             camera_right: [3,] right vector in world coordinates
             width: image width in pixels
             height: image height in pixels
+            image: PIL Image captured from this camera view
         """
         self.position = np.asarray(position, dtype=np.float32)
         self.camera_up = np.asarray(camera_up, dtype=np.float32)
         self.camera_right = np.asarray(camera_right, dtype=np.float32)
         self.width = width
         self.height = height
+        self.image = image
 
         # Cached matrices (lazy computed)
         self._viewmat: Optional[torch.Tensor] = None
         self._K: Optional[torch.Tensor] = None
+        self._image_tensor: Optional[torch.Tensor] = None
 
     @property
     def viewmat(self) -> torch.Tensor:
@@ -57,6 +62,15 @@ class Camera(ABC):
     def K(self) -> torch.Tensor:
         """3x3 intrinsic matrix (camera-type specific)."""
         pass
+
+    @property
+    def image_tensor(self) -> torch.Tensor:
+        """[H, W, 4] RGBA tensor (float32, 0-1)."""
+        if self._image_tensor is None:
+            self._image_tensor = torch.from_numpy(
+                np.array(self.image.convert('RGBA'))
+            ).float() / 255.0
+        return self._image_tensor
 
     @abstractmethod
     def project(self, points: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -90,6 +104,7 @@ class Camera(ABC):
         """Invalidate cached matrices when parameters change."""
         self._viewmat = None
         self._K = None
+        self._image_tensor = None
 
 
 def compute_camera_position(

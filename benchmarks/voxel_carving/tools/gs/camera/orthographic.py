@@ -4,6 +4,7 @@ from typing import Tuple
 
 import numpy as np
 import torch
+from PIL import Image
 
 from .base import Camera, compute_camera_position
 
@@ -23,6 +24,7 @@ class OrthographicCamera(Camera):
         camera_right: np.ndarray,
         width: int,
         height: int,
+        image: Image.Image,
         ortho_scale: float = 2.0,
     ):
         """Initialize orthographic camera.
@@ -33,9 +35,10 @@ class OrthographicCamera(Camera):
             camera_right: [3,] right vector in world coordinates
             width: image width in pixels
             height: image height in pixels
+            image: PIL Image captured from this camera view
             ortho_scale: world units visible in half the image
         """
-        super().__init__(position, camera_up, camera_right, width, height)
+        super().__init__(position, camera_up, camera_right, width, height, image)
         self.ortho_scale = ortho_scale
 
     @property
@@ -87,6 +90,7 @@ class OrthographicCamera(Camera):
         pitch_deg: float,
         camera_up: np.ndarray,
         camera_right: np.ndarray,
+        image: Image.Image,
         distance: float = 5.0,
         width: int = 128,
         height: int = 128,
@@ -99,6 +103,7 @@ class OrthographicCamera(Camera):
             pitch_deg: pitch angle in degrees (90 = below, -90 = above)
             camera_up: [3,] up vector
             camera_right: [3,] right vector
+            image: PIL Image captured from this camera view
             distance: distance from origin
             width: image width in pixels
             height: image height in pixels
@@ -115,5 +120,6 @@ class OrthographicCamera(Camera):
             camera_right=np.asarray(camera_right, dtype=np.float32),
             width=width,
             height=height,
+            image=image,
             ortho_scale=ortho_scale,
         )

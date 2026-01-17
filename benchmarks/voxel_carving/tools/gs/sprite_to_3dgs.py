@@ -29,8 +29,8 @@ from .constants import SPRITES_JSON, SPRITES_DIR
 from .device import get_device
 from .gaussians import Gaussians
 from .ply import export_ply
-from .sprites import load_sprites
-from .camera import CameraCollection, CameraOptModule
+from .sprites import load_cameras
+from .camera import CameraOptModule
 from .render import render_gaussians_simple, try_gsplat_render
 from .voxel_carving import initialize_from_visual_hull
 
@@ -261,31 +261,25 @@ def main() -> None:
 
     project_dir = Path(__file__).parent.parent.parent
 
-    print("Loading sprites and camera data...")
-    images, metadata = load_sprites(
+    print("Loading sprites and cameras...")
+    cameras = load_cameras(
         project_dir / SPRITES_JSON,
-        project_dir / SPRITES_DIR
-    )
-    print(f"  Loaded {len(images)} sprites")
-
-    print(f"Building {args.camera_type} cameras...")
-    cameras = CameraCollection.from_metadata(
-        metadata,
+        project_dir / SPRITES_DIR,
         camera_type=args.camera_type,
         ortho_scale=args.ortho_scale,
         fov_deg=args.fov,
     )
-    print(f"  Built {len(cameras)} cameras")
+    print(f"  Loaded {len(cameras)} cameras")
 
     gaussians = initialize_from_visual_hull(
-        images, cameras,
+        cameras,
         resolution=args.resolution,
         num_gaussians=args.num_gaussians,
     )
 
     print(f"Training for {args.iterations} iterations...")
     gaussians = train_gaussians(
-        images, cameras, gaussians,
+        cameras.images, cameras, gaussians,
         num_iterations=args.iterations,
         lr=args.lr,
         device=args.device,

@@ -4,6 +4,7 @@ from typing import Tuple
 
 import numpy as np
 import torch
+from PIL import Image
 
 from .base import Camera, compute_camera_position
 
@@ -22,6 +23,7 @@ class PerspectiveCamera(Camera):
         camera_right: np.ndarray,
         width: int,
         height: int,
+        image: Image.Image,
         fov_deg: float = 60.0,
         near: float = 0.1,
         far: float = 100.0,
@@ -34,11 +36,12 @@ class PerspectiveCamera(Camera):
             camera_right: [3,] right vector in world coordinates
             width: image width in pixels
             height: image height in pixels
+            image: PIL Image captured from this camera view
             fov_deg: vertical field of view in degrees
             near: near clipping plane distance
             far: far clipping plane distance
         """
-        super().__init__(position, camera_up, camera_right, width, height)
+        super().__init__(position, camera_up, camera_right, width, height, image)
         self.fov_deg = fov_deg
         self.near = near
         self.far = far
@@ -96,6 +99,7 @@ class PerspectiveCamera(Camera):
         pitch_deg: float,
         camera_up: np.ndarray,
         camera_right: np.ndarray,
+        image: Image.Image,
         distance: float = 5.0,
         width: int = 128,
         height: int = 128,
@@ -110,6 +114,7 @@ class PerspectiveCamera(Camera):
             pitch_deg: pitch angle in degrees (90 = below, -90 = above)
             camera_up: [3,] up vector
             camera_right: [3,] right vector
+            image: PIL Image captured from this camera view
             distance: distance from origin
             width: image width in pixels
             height: image height in pixels
@@ -128,6 +133,7 @@ class PerspectiveCamera(Camera):
             camera_right=np.asarray(camera_right, dtype=np.float32),
             width=width,
             height=height,
+            image=image,
             fov_deg=fov_deg,
             near=near,
             far=far,
