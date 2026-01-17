@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 import torch
 import torch.nn.functional as F
 
+from .cameras import Cameras
 from .gaussians import Gaussians
 from .sh import eval_sh
 
@@ -16,24 +17,17 @@ CLAMP_EPSILON = 1e-6
 
 def render_gaussians_simple(
     gaussians: Gaussians,
-    viewmat: torch.Tensor,
-    K: torch.Tensor,
-    width: int,
-    height: int,
-    camera_pos: Optional[torch.Tensor] = None,
+    cameras: Cameras,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Simple differentiable Gaussian splatting renderer (CPU-friendly).
 
     Projects Gaussians and accumulates with alpha blending (back to front).
+    Renders the first camera in the Cameras batch.
 
     Args:
         gaussians: Gaussians object with means, scales, quats, opacities, sh_coeffs
-        viewmat: [4, 4] view matrix
-        K: [3, 3] intrinsic matrix
-        width: image width
-        height: image height
-        camera_pos: [3] camera position in world coords (computed from viewmat if None)
+        cameras: Cameras object (uses first camera if batch)
 
     Returns:
         render_rgb: [H, W, 3]
@@ -45,15 +39,19 @@ def render_gaussians_simple(
     sh_coeffs = gaussians.sh_coeffs
     sh_degree = gaussians.sh_degree
 
+    # Get single camera viewmat and K
+    viewmat = cameras.viewmats[0] if cameras.viewmats.dim() == 3 else cameras.viewmats
+    K = cameras.Ks[0] if cameras.Ks.dim() == 3 else cameras.Ks
+    width = cameras.width
+    height = cameras.height
+
     n = means.shape[0]
     device = means.device
 
-    # Compute camera position from view matrix if not provided
-    if camera_pos is None:
-        # viewmat is world-to-camera, so camera position is -R^T @ t
-        rot = viewmat[:3, :3]
-        trans = viewmat[:3, 3]
-        camera_pos = -rot.T @ trans
+    # Compute camera position from view matrix
+    rot = viewmat[:3, :3]
+    trans = viewmat[:3, 3]
+    camera_pos = -rot.T @ trans
 
     # Compute viewing directions (Gaussian to camera, normalized)
     view_dirs = camera_pos.unsqueeze(0) - means  # [N, 3]
@@ -115,20 +113,14 @@ def render_gaussians_simple(
 
 def try_gsplat_render(
     gaussians: Gaussians,
-    viewmats: torch.Tensor,
-    Ks: torch.Tensor,
-    width: int,
-    height: int,
+    cameras: Cameras,
 ):
     """
     Try to use gsplat for rendering if available.
 
     Args:
         gaussians: Gaussians object with means, scales, quats, opacities, sh_coeffs
-        viewmats: [C, 4, 4] view matrices
-        Ks: [C, 3, 3] intrinsic matrices
-        width: image width
-        height: image height
+        cameras: Cameras object with viewmats, Ks, and camera_model
 
     Returns:
         (render_colors, render_alphas) if successful, None otherwise
@@ -150,11 +142,11 @@ def try_gsplat_render(
             scales=actual_scales,
             opacities=actual_opacities,
             colors=gaussians.sh_coeffs,
-            viewmats=viewmats,
-            Ks=Ks,
-            width=width,
-            height=height,
-            camera_model="ortho",
+            viewmats=cameras.viewmats,
+            Ks=cameras.Ks,
+            width=cameras.width,
+            height=cameras.height,
+            camera_model=cameras.camera_model,
             packed=False,
             sh_degree=gaussians.sh_degree,
         )

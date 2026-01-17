@@ -72,6 +72,26 @@ class CameraCollection:
         """
         return self.viewmats, self.Ks
 
+    def to_cameras(self) -> 'Cameras':
+        """Convert to Cameras dataclass for rendering.
+
+        Returns:
+            Cameras object with viewmats, Ks, and camera_model
+        """
+        from ..cameras import Cameras
+
+        if len(self._cameras) == 0:
+            raise ValueError("Cannot convert empty CameraCollection to Cameras")
+
+        camera_model = "pinhole" if isinstance(self._cameras[0], PerspectiveCamera) else "ortho"
+        return Cameras(
+            viewmats=self.viewmats,
+            Ks=self.Ks,
+            camera_model=camera_model,
+            width=self._cameras[0].width,
+            height=self._cameras[0].height,
+        )
+
     @classmethod
     def from_metadata(
         cls,

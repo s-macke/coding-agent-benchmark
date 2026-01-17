@@ -24,6 +24,7 @@ from typing import List
 import torch
 import torch.nn.functional as F
 
+from .cameras import Cameras
 from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SPRITES_JSON, SPRITES_DIR, SH_DEGREE
 from .device import get_device
 from .gaussians import Gaussians
@@ -163,9 +164,8 @@ def train_gaussians(
     target_rgb = targets[:, :, :, :3]
     target_alpha = targets[:, :, :, 3:4]
 
-    # Get stacked tensors for batch rendering
-    viewmats = cameras.viewmats.to(device)
-    intrinsics = cameras.Ks.to(device)
+    # Convert cameras to Cameras dataclass
+    cams = cameras.to_cameras().to(device)
 
     means = init_gaussians.means.clone().to(device)
     if not fix_positions:
@@ -194,7 +194,7 @@ def train_gaussians(
 
     optimizer = torch.optim.Adam(param_groups)
 
-    num_views = viewmats.shape[0]
+    num_views = len(cams)
 
     # Setup camera pose optimization if enabled
     pose_adjust = None
@@ -213,9 +213,7 @@ def train_gaussians(
     # Test if gsplat works
     sh_full = torch.cat([sh0, shN], dim=1)
     test_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
-    gsplat_result = try_gsplat_render(
-        test_gaussians, viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE,
-    )
+    gsplat_result = try_gsplat_render(test_gaussians, cams[:1])
     use_gsplat = gsplat_result is not None
 
     print(f"  Using {'gsplat' if use_gsplat else 'simple'} renderer "
@@ -232,14 +230,19 @@ def train_gaussians(
 
         if use_gsplat:
             # Apply pose adjustment if enabled
-            current_viewmats = viewmats
+            current_cams = cams
             if pose_adjust is not None:
                 camera_ids = torch.arange(num_views, device=device)
-                current_viewmats = pose_adjust.forward_viewmats(viewmats, camera_ids)
+                adjusted_viewmats = pose_adjust.forward_viewmats(cams.viewmats, camera_ids)
+                current_cams = Cameras(
+                    viewmats=adjusted_viewmats,
+                    Ks=cams.Ks,
+                    camera_model=cams.camera_model,
+                    width=cams.width,
+                    height=cams.height,
+                )
 
-            result = try_gsplat_render(
-                current_gaussians, current_viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE,
-            )
+            result = try_gsplat_render(current_gaussians, current_cams)
             if result is None:
                 use_gsplat = False
                 continue
@@ -254,16 +257,22 @@ def train_gaussians(
 
             for vi in view_indices:
                 # Apply pose adjustment if enabled
-                current_viewmat = viewmats[vi]
+                current_viewmat = cams.viewmats[vi]
                 if pose_adjust is not None:
                     camera_id = torch.tensor(vi.item(), device=device)
                     current_viewmat = pose_adjust.forward_viewmats(
-                        viewmats[vi].unsqueeze(0), camera_id.unsqueeze(0)
+                        cams.viewmats[vi].unsqueeze(0), camera_id.unsqueeze(0)
                     ).squeeze(0)
 
-                rc, ra = render_gaussians_simple(
-                    current_gaussians, current_viewmat, intrinsics[vi], IMAGE_SIZE, IMAGE_SIZE,
+                # Create single-camera Cameras object
+                single_cam = Cameras(
+                    viewmats=current_viewmat.unsqueeze(0),
+                    Ks=cams.Ks[vi].unsqueeze(0),
+                    camera_model=cams.camera_model,
+                    width=cams.width,
+                    height=cams.height,
                 )
+                rc, ra = render_gaussians_simple(current_gaussians, single_cam)
                 render_colors_list.append(rc)
                 render_alphas_list.append(ra)
 

@@ -22,12 +22,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from .cameras import Cameras
 from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR
 from .device import get_device
 from .gaussians import Gaussians
 from .ply import load_ply
 from .sprites import load_sprites
-from .camera import CameraCollection, PerspectiveCamera
+from .camera import CameraCollection
 from .render import try_gsplat_render
 from .sh import eval_sh
 
@@ -36,29 +37,29 @@ import torch.nn.functional as F
 
 def render_points_fast(
     gaussians: Gaussians,
-    viewmat: torch.Tensor,
-    K: torch.Tensor,
-    width: int,
-    height: int,
-    perspective: bool = False,
+    cameras: Cameras,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Fast point-based renderer using scatter_add (fully vectorized).
 
     Renders gaussians as colored points with depth sorting.
+    Renders the first camera in the Cameras batch.
 
     Args:
         gaussians: Gaussians object with means, opacities, sh_coeffs
-        viewmat: [4, 4] view matrix
-        K: [3, 3] intrinsic matrix
-        width: image width
-        height: image height
-        perspective: If True, use perspective projection
+        cameras: Cameras object (uses first camera if batch)
     """
     means = gaussians.means
     opacities = gaussians.opacities
     sh_coeffs = gaussians.sh_coeffs
     sh_degree = gaussians.sh_degree
+
+    # Get single camera
+    viewmat = cameras.viewmats[0] if cameras.viewmats.dim() == 3 else cameras.viewmats
+    K = cameras.Ks[0] if cameras.Ks.dim() == 3 else cameras.Ks
+    width = cameras.width
+    height = cameras.height
+    perspective = cameras.is_perspective
 
     device = means.device
     n = means.shape[0]
@@ -134,35 +135,25 @@ def render_all_views(
     device = get_device(device)
 
     g = gaussians.to(device)
+    cams = cameras.to_cameras().to(device)
     sh_degree = g.sh_degree
 
-    # Get stacked tensors for batch rendering
-    viewmats = cameras.viewmats.to(device)
-    intrinsics = cameras.Ks.to(device)
-
-    # Detect if using perspective cameras
-    use_perspective = len(cameras) > 0 and isinstance(cameras[0], PerspectiveCamera)
-
     # Check if gsplat works
-    gsplat_result = try_gsplat_render(
-        g, viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE,
-    )
+    gsplat_result = try_gsplat_render(g, cams[:1])
     use_gsplat = gsplat_result is not None
 
     if use_gsplat:
         print(f"  Using gsplat renderer (SH degree {sh_degree})")
     else:
-        proj_type = "perspective" if use_perspective else "orthographic"
+        proj_type = "perspective" if cams.is_perspective else "orthographic"
         print(f"  Using fast point renderer ({proj_type}, SH degree {sh_degree})")
 
     renders = []
-    num_views = len(cameras)
+    num_views = len(cams)
 
     if use_gsplat:
         # Render all views at once with gsplat
-        result = try_gsplat_render(
-            g, viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE,
-        )
+        result = try_gsplat_render(g, cams)
         if result is not None:
             render_colors, render_alphas = result
             for i in range(num_views):
@@ -173,14 +164,9 @@ def render_all_views(
 
     if not use_gsplat:
         # Use fast point renderer
-        for i, camera in enumerate(cameras):
+        for i in range(num_views):
             print(f"  Rendering view {i + 1}/{num_views}...", end='\r')
-            viewmat = camera.viewmat.to(device)
-            K = camera.K.to(device)
-            rgb, alpha = render_points_fast(
-                g, viewmat, K, IMAGE_SIZE, IMAGE_SIZE,
-                perspective=use_perspective,
-            )
+            rgb, alpha = render_points_fast(g, cams[i])
             rgba = torch.cat([rgb, alpha], dim=-1)
             renders.append(rgba.cpu())
         print()
