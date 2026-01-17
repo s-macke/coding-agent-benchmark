@@ -1,4 +1,4 @@
-package main
+package voxelgrid
 
 import "voxelcarve/common"
 

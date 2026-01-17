@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var huffmanTable = []string{
+var Table = []string{
 	"1111110101100100000010", "1111110101100100000011", "1111110101100100000100", "1111110101100100000101",
 	"1111110101100100000110", "1111110101100100000111", "1111110101100100001000", "1111110101100100001001",
 	"1111110101100100001010", "00111", "10101", "1111110101100100001011", "1111110101100100001100",
@@ -42,13 +42,13 @@ func splitString(s string, n int) []string {
 	return result
 }
 
-func HuffmanEncode(body string) string {
+func Encode(body string) string {
 	var result strings.Builder
 	for _, ch := range body {
-		result.WriteString(huffmanTable[int(ch)])
+		result.WriteString(Table[int(ch)])
 	}
 	// encode a final EOT character
-	result.WriteString(huffmanTable[4])
+	result.WriteString(Table[4])
 	bits := result.String()
 	// add trailing zeros to match a multiple of 13 bits
 	nzeros := 13 - (len(bits) % 13)
@@ -69,7 +69,7 @@ func reverseString(s string) string {
 	return string(runes)
 }
 
-func Base95Encode(s string) string {
+func Encode2(s string) string {
 	code := splitString(s, 13)
 	var result strings.Builder
 	for _, c := range code {
@@ -100,8 +100,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	bits := HuffmanEncode(string(body))
-	code := Base95Encode(bits)
+	bits := Encode(string(body))
+	code := Encode2(bits)
 
 	lines := splitString(code, 70)
 	output := "(*!1N!*)mcm\n" + strings.Join(lines, "\n") + "\n"

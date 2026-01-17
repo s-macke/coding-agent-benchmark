@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"voxelcarve/common"
+	"voxelcarve/voxelgrid"
 )
 
 // ExportPLY exports occupied voxel centers as an ASCII PLY point cloud.
@@ -36,7 +37,7 @@ func ExportPLY(points []common.Vec3, path string) error {
 }
 
 // ExportColoredPLY exports colored voxels from grid as an ASCII PLY point cloud with RGB.
-func ExportColoredPLY(grid *VoxelGrid, path string) error {
+func ExportColoredPLY(grid *voxelgrid.VoxelGrid, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -78,7 +79,7 @@ func ExportColoredPLY(grid *VoxelGrid, path string) error {
 
 // ExportMeshPLY exports colored voxels as a PLY mesh with cube geometry.
 // Each voxel becomes a cube with 8 vertices and 6 quad faces.
-func ExportMeshPLY(grid *VoxelGrid, path string) error {
+func ExportMeshPLY(grid *voxelgrid.VoxelGrid, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -172,7 +173,7 @@ func ExportMeshPLY(grid *VoxelGrid, path string) error {
 }
 
 // ExportVOX exports colored voxels as a MagicaVoxel .vox file.
-func ExportVOX(grid *VoxelGrid, path string) error {
+func ExportVOX(grid *voxelgrid.VoxelGrid, path string) error {
 	if grid.Resolution > 256 {
 		return fmt.Errorf("grid resolution %d exceeds .vox maximum of 256", grid.Resolution)
 	}

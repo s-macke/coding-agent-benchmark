@@ -4,17 +4,19 @@ import (
 	"fmt"
 
 	"voxelcarve/camera"
+	"voxelcarve/common"
+	"voxelcarve/voxelgrid"
 )
 
 // viewInfo holds camera and image info for a single view.
 type viewInfo struct {
 	cam     camera.Camera
-	img     *SpriteImage
+	img     *common.SpriteImage
 	mirrorX bool
 }
 
 // buildViews creates a list of all views including mirrored ones if symmetry is enabled.
-func buildViews(cameras []camera.Camera, images []*SpriteImage, symmetry bool) []viewInfo {
+func buildViews(cameras []camera.Camera, images []*common.SpriteImage, symmetry bool) []viewInfo {
 	views := make([]viewInfo, 0, len(cameras)*2)
 	for i, cam := range cameras {
 		views = append(views, viewInfo{cam, images[i], false})
@@ -30,7 +32,7 @@ func buildViews(cameras []camera.Camera, images []*SpriteImage, symmetry bool) [
 // CarveVisualHull performs space carving from multiple silhouettes using vote counting.
 // A voxel is carved only if at least minVotes views agree (alpha < 0.5).
 // If symmetry is true, also uses mirrored views (doubles effective views).
-func CarveVisualHull(grid *VoxelGrid, cameras []camera.Camera, images []*SpriteImage, symmetry bool, minVotes int) {
+func CarveVisualHull(grid *voxelgrid.VoxelGrid, cameras []camera.Camera, images []*common.SpriteImage, symmetry bool, minVotes int) {
 	views := buildViews(cameras, images, symmetry)
 	fmt.Printf("Carving with %d views (symmetry=%v, minVotes=%d)...\n", len(views), symmetry, minVotes)
 
@@ -71,7 +73,7 @@ func CarveVisualHull(grid *VoxelGrid, cameras []camera.Camera, images []*SpriteI
 
 // SampleColors samples RGB colors for all occupied voxels by projecting to views.
 // Colors are stored directly in the grid using minimum value per channel.
-func SampleColors(grid *VoxelGrid, cameras []camera.Camera, images []*SpriteImage, symmetry bool) {
+func SampleColors(grid *voxelgrid.VoxelGrid, cameras []camera.Camera, images []*common.SpriteImage, symmetry bool) {
 	fmt.Println("Sampling colors...")
 
 	views := buildViews(cameras, images, symmetry)

@@ -1,12 +1,10 @@
-package main
+package common
 
 import (
 	"image"
 	"image/png"
 	"math"
 	"os"
-
-	"voxelcarve/common"
 )
 
 // SpriteImage wraps an image.Image with alpha threshold for silhouette checks.
@@ -63,9 +61,9 @@ func (s *SpriteImage) rgbaAt(x, y int) (r, g, b, a float64) {
 // Sample returns bilinear interpolated RGBA (0-1) at float coordinates.
 // Pixel centers are at half-integer coordinates (0.5, 1.5, ...).
 // Returns zero color for out-of-bounds coordinates.
-func (s *SpriteImage) Sample(x, y float64) common.Color {
+func (s *SpriteImage) Sample(x, y float64) Color {
 	if x < 0 || x >= float64(s.Width()) || y < 0 || y >= float64(s.Height()) {
-		return common.Color{}
+		return Color{}
 	}
 
 	// Offset by 0.5 so pixel centers are at half-integers
@@ -85,7 +83,7 @@ func (s *SpriteImage) Sample(x, y float64) common.Color {
 	w01 := (1 - fx) * fy
 	w11 := fx * fy
 
-	return common.Color{
+	return Color{
 		R: w00*r00 + w10*r10 + w01*r01 + w11*r11,
 		G: w00*g00 + w10*g10 + w01*g01 + w11*g11,
 		B: w00*b00 + w10*b10 + w01*b01 + w11*b11,

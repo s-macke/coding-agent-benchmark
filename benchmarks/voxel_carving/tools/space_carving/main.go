@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"voxelcarve/camera"
+	"voxelcarve/common"
+	"voxelcarve/voxelgrid"
 )
 
 func fatalf(format string, args ...interface{}) {
@@ -93,12 +95,12 @@ func main() {
 	}
 	fmt.Printf("Loading images and building cameras (%s)...\n", projType)
 	cameras := make([]camera.Camera, len(sprites))
-	images := make([]*SpriteImage, len(sprites))
+	images := make([]*common.SpriteImage, len(sprites))
 
 	for i, sprite := range sprites {
 		imgPath := filepath.Join(*imagesDir, sprite.Filename)
 
-		img, err := LoadSpriteImage(imgPath, *alphaThreshold)
+		img, err := common.LoadSpriteImage(imgPath, *alphaThreshold)
 		if err != nil {
 			fatalf("Error loading image %s: %v", imgPath, err)
 		}
@@ -132,7 +134,7 @@ func main() {
 
 	fmt.Printf("Creating %dx%dx%d voxel grid (extent ±%.2f)...\n",
 		*resolution, *resolution, *resolution, *extent)
-	grid := NewVoxelGrid(*resolution, *extent)
+	grid := voxelgrid.NewVoxelGrid(*resolution, *extent)
 	fmt.Printf("  Initial voxels: %d\n", grid.OccupiedCount())
 
 	fmt.Println("Carving visual hull...")
