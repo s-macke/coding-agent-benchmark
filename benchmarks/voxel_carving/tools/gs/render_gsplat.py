@@ -9,7 +9,7 @@ from .cameras import Cameras
 from .gaussians import Gaussians
 
 
-def try_gsplat_render(
+def render_gsplat(
     gaussians: Gaussians,
     cameras: Cameras,
 ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:

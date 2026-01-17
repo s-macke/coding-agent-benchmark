@@ -13,7 +13,7 @@ from .camera import (
 )
 from .render import render_gaussians
 from .render_simple import render_gaussians_simple
-from .render_gsplat import try_gsplat_render
+from .render_gsplat import render_gsplat
 from .gaussians import eval_sh, rgb_to_sh, sh_to_rgb, init_sh_from_rgb
 
 __all__ = [
@@ -34,7 +34,7 @@ __all__ = [
     # Render
     'render_gaussians',
     'render_gaussians_simple',
-    'try_gsplat_render',
+    'render_gsplat',
     # Spherical Harmonics
     'eval_sh',
     'rgb_to_sh',

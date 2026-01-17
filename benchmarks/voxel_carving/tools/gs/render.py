@@ -6,7 +6,7 @@ import torch
 
 from .cameras import Cameras
 from .gaussians import Gaussians
-from .render_gsplat import try_gsplat_render
+from .render_gsplat import render_gsplat
 from .render_points_fast import render_points_fast
 
 
@@ -25,7 +25,7 @@ def render_gaussians(
         render_rgb: [H, W, 3]
         render_alpha: [H, W, 1]
     """
-    result = try_gsplat_render(gaussians, cameras)
+    result = render_gsplat(gaussians, cameras)
     if result is not None:
         return result[0][0], result[1][0]
 

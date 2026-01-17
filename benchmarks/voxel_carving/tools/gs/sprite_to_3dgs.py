@@ -29,7 +29,7 @@ from .gaussians import Gaussians, export_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule
 from .render_simple import render_gaussians_simple
-from .render_gsplat import try_gsplat_render
+from .render_gsplat import render_gsplat
 from .train_args import TrainConfig, parse_args
 from .voxel_carving import initialize_from_visual_hull
 
@@ -125,7 +125,7 @@ def train_gaussians(
     # Test if gsplat works
     sh_full = torch.cat([sh0, shN], dim=1)
     test_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
-    gsplat_result = try_gsplat_render(test_gaussians, cams[:1])
+    gsplat_result = render_gsplat(test_gaussians, cams[:1])
     use_gsplat = gsplat_result is not None
 
     print(f"  Using {'gsplat' if use_gsplat else 'simple'} renderer "
@@ -154,10 +154,7 @@ def train_gaussians(
                     height=cams.height,
                 )
 
-            result = try_gsplat_render(current_gaussians, current_cams)
-            if result is None:
-                use_gsplat = False
-                continue
+            result = render_gsplat(current_gaussians, current_cams)
             render_colors, render_alphas = result
             target_rgb_batch = target_rgb
             target_alpha_batch = target_alpha
