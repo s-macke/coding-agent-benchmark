@@ -1,6 +1,7 @@
 """Camera collection for batch operations."""
 
-from typing import Iterator, List, Literal, Optional, Tuple, TYPE_CHECKING
+from enum import Enum
+from typing import Iterator, List, Optional, Tuple, TYPE_CHECKING
 
 import torch
 
@@ -12,7 +13,11 @@ from ..constants import IMAGE_SIZE
 if TYPE_CHECKING:
     from ..sprites import SpriteData
 
-CameraType = Literal["orthographic", "perspective"]
+
+class CameraType(Enum):
+    """Camera projection type."""
+    ORTHOGRAPHIC = "orthographic"
+    PERSPECTIVE = "perspective"
 
 
 class CameraCollection:
@@ -104,7 +109,7 @@ class CameraCollection:
     def from_sprites(
         cls,
         sprites: "List[SpriteData]",
-        camera_type: CameraType = "orthographic",
+        camera_type: CameraType = CameraType.ORTHOGRAPHIC,
         ortho_scale: float = 2.0,
         fov_deg: float = 60.0,
         near: float = 0.1,
@@ -117,7 +122,7 @@ class CameraCollection:
 
         Args:
             sprites: list of SpriteData objects with camera params and images
-            camera_type: "orthographic" or "perspective"
+            camera_type: CameraType.ORTHOGRAPHIC or CameraType.PERSPECTIVE
             ortho_scale: (orthographic only) world units visible in half the image
             fov_deg: (perspective only) vertical field of view in degrees
             near: (perspective only) near clipping plane distance
@@ -131,7 +136,7 @@ class CameraCollection:
         """
         cameras = []
         for sprite in sprites:
-            if camera_type == "orthographic":
+            if camera_type == CameraType.ORTHOGRAPHIC:
                 camera = OrthographicCamera.from_angles(
                     yaw_deg=sprite.yaw,
                     pitch_deg=sprite.pitch,
@@ -143,7 +148,7 @@ class CameraCollection:
                     height=height,
                     ortho_scale=ortho_scale,
                 )
-            elif camera_type == "perspective":
+            elif camera_type == CameraType.PERSPECTIVE:
                 camera = PerspectiveCamera.from_angles(
                     yaw_deg=sprite.yaw,
                     pitch_deg=sprite.pitch,

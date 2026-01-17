@@ -3,6 +3,8 @@
 import argparse
 from dataclasses import dataclass
 
+from .camera import CameraType
+
 
 @dataclass
 class TrainConfig:
@@ -20,7 +22,7 @@ class TrainingArgs:
     output: str
     resolution: int
     num_gaussians: int
-    camera_type: str
+    camera_type: CameraType
     ortho_scale: float
     fov: float
     train: TrainConfig
@@ -51,7 +53,7 @@ def parse_args() -> TrainingArgs:
         output=args.output,
         resolution=args.resolution,
         num_gaussians=args.num_gaussians,
-        camera_type=args.camera_type,
+        camera_type=CameraType(args.camera_type),
         ortho_scale=args.ortho_scale,
         fov=args.fov,
         train=TrainConfig(

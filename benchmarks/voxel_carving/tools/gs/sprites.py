@@ -10,6 +10,8 @@ from PIL import Image
 if TYPE_CHECKING:
     from .camera import CameraCollection
 
+from .camera import CameraType
+
 
 @dataclass
 class SpriteData:
@@ -77,7 +79,7 @@ def load_sprites(json_path: Path, images_dir: Path) -> List[SpriteData]:
 def load_cameras(
     json_path: Path,
     images_dir: Path,
-    camera_type: str = "orthographic",
+    camera_type: CameraType = CameraType.ORTHOGRAPHIC,
     ortho_scale: float = 2.0,
     fov_deg: float = 60.0,
 ) -> "CameraCollection":
@@ -88,7 +90,7 @@ def load_cameras(
     Args:
         json_path: Path to JSON file with sprite metadata
         images_dir: Directory containing sprite images
-        camera_type: "orthographic" or "perspective"
+        camera_type: CameraType.ORTHOGRAPHIC or CameraType.PERSPECTIVE
         ortho_scale: (orthographic) world units visible in half the image
         fov_deg: (perspective) vertical field of view in degrees
 

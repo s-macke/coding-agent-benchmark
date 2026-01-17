@@ -25,7 +25,7 @@ import torch
 import torch.nn.functional as F
 
 from .cameras import Cameras
-from .camera import CameraCollection
+from .camera import CameraCollection, CameraType
 from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR
 from .device import get_device
 from .gaussians import Gaussians
@@ -41,7 +41,7 @@ class RenderArgs:
     input: str
     output: str
     device: str
-    camera_type: str
+    camera_type: CameraType
     ortho_scale: float
     fov: float
 
@@ -64,7 +64,7 @@ def parse_args() -> RenderArgs:
         input=args.input,
         output=args.output,
         device=args.device,
-        camera_type=args.camera_type,
+        camera_type=CameraType(args.camera_type),
         ortho_scale=args.ortho_scale,
         fov=args.fov,
     )
