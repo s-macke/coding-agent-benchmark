@@ -10,10 +10,9 @@ from typing import List
 
 import torch
 
-from .constants import ALPHA_THRESHOLD, SH_DEGREE
+from .constants import ALPHA_THRESHOLD
 from .camera import CameraCollection
-from .gaussians import Gaussians
-from .sh import init_sh_from_rgb
+from .gaussians import Gaussians, init_sh_from_rgb, SH_DEGREE
 
 # Gaussian initialization constants
 INITIAL_LOG_SCALE = -3.5  # exp(-3.5) ~ 0.03

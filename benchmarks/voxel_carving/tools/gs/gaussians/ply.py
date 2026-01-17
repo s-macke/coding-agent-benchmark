@@ -5,9 +5,8 @@ import struct
 import numpy as np
 import torch
 
-from .constants import SH_DEGREE
 from .gaussians import Gaussians
-from .sh import SH_C0
+from .sh import SH_C0, SH_DEGREE
 
 
 def load_ply(path: str, sh_degree: int = SH_DEGREE) -> Gaussians:

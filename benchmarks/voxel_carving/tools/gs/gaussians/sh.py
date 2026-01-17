@@ -19,6 +19,9 @@ SH_C2_4 = 0.5462742152960396   # sqrt(15) / (4 * sqrt(pi))
 # Number of coefficients per degree
 SH_DEGREE_COEFFS = {0: 1, 1: 4, 2: 9, 3: 16}
 
+# Default SH degree for view-dependent color
+SH_DEGREE = 2
+
 
 def rgb_to_sh(rgb: Tensor) -> Tensor:
     """Convert RGB color to SH DC (degree 0) coefficient.

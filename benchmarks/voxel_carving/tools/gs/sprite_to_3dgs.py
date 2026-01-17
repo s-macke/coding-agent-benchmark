@@ -25,8 +25,7 @@ import torch.nn.functional as F
 from .cameras import Cameras
 from .constants import SPRITES_JSON, SPRITES_DIR
 from .device import get_device
-from .gaussians import Gaussians
-from .ply import export_ply
+from .gaussians import Gaussians, export_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule
 from .render_simple import render_gaussians_simple

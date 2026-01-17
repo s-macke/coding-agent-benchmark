@@ -6,9 +6,8 @@ import torch
 import torch.nn.functional as F
 
 from .cameras import Cameras
-from .gaussians import Gaussians
+from .gaussians import Gaussians, eval_sh
 from .projection import project_points
-from .sh import eval_sh
 
 
 def render_points_fast(

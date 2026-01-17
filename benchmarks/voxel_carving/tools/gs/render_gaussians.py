@@ -26,8 +26,7 @@ import torch
 from .camera import CameraCollection, CameraType
 from .constants import SPRITES_JSON, SPRITES_DIR
 from .device import get_device
-from .gaussians import Gaussians
-from .ply import load_ply
+from .gaussians import Gaussians, load_ply
 from .sprites import load_cameras
 from .render import render_gaussians
 
