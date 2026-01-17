@@ -24,11 +24,12 @@ from typing import List, Tuple
 import torch
 import torch.nn.functional as F
 
-from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SPRITES_JSON, SPRITES_DIR
+from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SPRITES_JSON, SPRITES_DIR, SH_DEGREE
 from .ply import export_ply
 from .sprites import load_sprites
 from .camera import CameraCollection
 from .render import render_gaussians_simple, try_gsplat_render
+from .sh import init_sh_from_rgb
 
 # Gaussian initialization constants
 INITIAL_LOG_SCALE = -3.5  # exp(-3.5) ~ 0.03
@@ -38,6 +39,8 @@ INITIAL_OPACITY_LOGIT = 0.5  # sigmoid(0.5) ~ 0.62
 SCALE_LR_MULTIPLIER = 0.1
 QUAT_LR_MULTIPLIER = 0.1
 OPACITY_LR_MULTIPLIER = 0.5
+SH0_LR_MULTIPLIER = 0.25  # DC term learning rate multiplier
+SHN_LR_MULTIPLIER = 0.0125  # Higher-order SH (1/20 of SH0, from gsplat)
 ALPHA_LOSS_WEIGHT = 0.5
 OPACITY_REG_WEIGHT = 0.01
 LOG_INTERVAL = 500
@@ -87,19 +90,29 @@ def carve_visual_hull(images: List[torch.Tensor],
     return points
 
 
-def init_gaussians(points: torch.Tensor,
-                   images: List[torch.Tensor],
-                   cameras: CameraCollection,
-                   num_gaussians: int = 5000) -> Tuple[torch.Tensor, ...]:
+def init_gaussians(
+    points: torch.Tensor,
+    images: List[torch.Tensor],
+    cameras: CameraCollection,
+    num_gaussians: int = 5000,
+    sh_degree: int = SH_DEGREE,
+) -> Tuple[torch.Tensor, ...]:
     """
     Initialize Gaussian parameters from point cloud.
+
+    Args:
+        points: [M, 3] candidate positions from visual hull
+        images: list of [H, W, 4] RGBA images
+        cameras: camera collection
+        num_gaussians: maximum number of Gaussians
+        sh_degree: spherical harmonics degree
 
     Returns:
         means: [N, 3] positions
         scales: [N, 3] log-scales
         quats: [N, 4] quaternions (wxyz)
         opacities: [N] logit opacities
-        colors: [N, 3] RGB colors
+        sh_coeffs: [N, K, 3] SH coefficients where K = (sh_degree+1)^2
     """
     if points.shape[0] > num_gaussians:
         idx = torch.randperm(points.shape[0])[:num_gaussians]
@@ -108,27 +121,28 @@ def init_gaussians(points: torch.Tensor,
         print("  Warning: Visual hull empty, using random initialization")
         points = (torch.rand(num_gaussians, 3) - 0.5) * 2.0
 
-    N = points.shape[0]
+    n = points.shape[0]
 
     means = points.clone()
-    scales = torch.full((N, 3), INITIAL_LOG_SCALE, dtype=torch.float32)
+    scales = torch.full((n, 3), INITIAL_LOG_SCALE, dtype=torch.float32)
 
-    quats = torch.zeros((N, 4), dtype=torch.float32)
+    quats = torch.zeros((n, 4), dtype=torch.float32)
     quats[:, 0] = 1.0  # Identity quaternion (w=1)
 
-    opacities = torch.full((N,), INITIAL_OPACITY_LOGIT, dtype=torch.float32)
+    opacities = torch.full((n,), INITIAL_OPACITY_LOGIT, dtype=torch.float32)
 
-    colors = torch.full((N, 3), 0.5, dtype=torch.float32)
-    color_counts = torch.zeros(N, dtype=torch.float32)
+    # Accumulate colors from visible views
+    colors = torch.full((n, 3), 0.5, dtype=torch.float32)
+    color_counts = torch.zeros(n, dtype=torch.float32)
 
     for img, camera in zip(images, cameras):
         proj_x, proj_y = camera.project(means)
 
-        H, W = img.shape[:2]
-        in_bounds = (proj_x >= 0) & (proj_x < W - 1) & (proj_y >= 0) & (proj_y < H - 1)
+        h, w = img.shape[:2]
+        in_bounds = (proj_x >= 0) & (proj_x < w - 1) & (proj_y >= 0) & (proj_y < h - 1)
 
-        px = proj_x.long().clamp(0, W - 1)
-        py = proj_y.long().clamp(0, H - 1)
+        px = proj_x.long().clamp(0, w - 1)
+        py = proj_y.long().clamp(0, h - 1)
 
         alpha = img[:, :, 3]
         rgb = img[:, :, :3]
@@ -141,20 +155,41 @@ def init_gaussians(points: torch.Tensor,
     valid_colors = color_counts > 0
     colors[valid_colors] /= color_counts[valid_colors].unsqueeze(1)
 
-    return means, scales, quats, opacities, colors
+    # Convert RGB to SH coefficients (DC term only, higher orders = 0)
+    sh_coeffs = init_sh_from_rgb(colors, sh_degree=sh_degree)
+
+    return means, scales, quats, opacities, sh_coeffs
 
 
-def train_gaussians(images: List[torch.Tensor],
-                    cameras: CameraCollection,
-                    init_means: torch.Tensor,
-                    init_scales: torch.Tensor,
-                    init_quats: torch.Tensor,
-                    init_opacities: torch.Tensor,
-                    init_colors: torch.Tensor,
-                    num_iterations: int = 5000,
-                    lr: float = 0.01,
-                    device: str = 'cuda') -> Tuple[torch.Tensor, ...]:
-    """Optimize Gaussian parameters to match target sprite views."""
+def train_gaussians(
+    images: List[torch.Tensor],
+    cameras: CameraCollection,
+    init_means: torch.Tensor,
+    init_scales: torch.Tensor,
+    init_quats: torch.Tensor,
+    init_opacities: torch.Tensor,
+    init_sh_coeffs: torch.Tensor,
+    num_iterations: int = 5000,
+    lr: float = 0.01,
+    sh_degree: int = SH_DEGREE,
+    device: str = 'cuda',
+) -> Tuple[torch.Tensor, ...]:
+    """
+    Optimize Gaussian parameters to match target sprite views.
+
+    Args:
+        images: list of [H, W, 4] target RGBA images
+        cameras: camera collection
+        init_*: initial Gaussian parameters
+        init_sh_coeffs: [N, K, 3] initial SH coefficients
+        num_iterations: training iterations
+        lr: base learning rate
+        sh_degree: SH degree for rendering
+        device: cuda or cpu
+
+    Returns:
+        Optimized (means, scales, quats, opacities, sh_coeffs)
+    """
     if device == 'cuda' and not torch.cuda.is_available():
         print("  CUDA not available, using CPU")
         device = 'cpu'
@@ -167,39 +202,52 @@ def train_gaussians(images: List[torch.Tensor],
 
     # Get stacked tensors for batch rendering
     viewmats = cameras.viewmats.to(device)
-    Ks = cameras.Ks.to(device)
+    intrinsics = cameras.Ks.to(device)
 
     means = init_means.clone().to(device).requires_grad_(True)
     scales = init_scales.clone().to(device).requires_grad_(True)
     quats = init_quats.clone().to(device).requires_grad_(True)
     opacities = init_opacities.clone().to(device).requires_grad_(True)
-    colors = init_colors.clone().to(device).requires_grad_(True)
+
+    # Split SH coefficients into DC (sh0) and higher order (shN)
+    sh_coeffs = init_sh_coeffs.clone().to(device)
+    sh0 = sh_coeffs[:, :1, :].clone().requires_grad_(True)  # [N, 1, 3]
+    shN = sh_coeffs[:, 1:, :].clone().requires_grad_(True)  # [N, K-1, 3]
 
     optimizer = torch.optim.Adam([
         {'params': means, 'lr': lr},
         {'params': scales, 'lr': lr * SCALE_LR_MULTIPLIER},
         {'params': quats, 'lr': lr * QUAT_LR_MULTIPLIER},
         {'params': opacities, 'lr': lr * OPACITY_LR_MULTIPLIER},
-        {'params': colors, 'lr': lr},
+        {'params': sh0, 'lr': lr * SH0_LR_MULTIPLIER},
+        {'params': shN, 'lr': lr * SHN_LR_MULTIPLIER},
     ])
 
-    C = viewmats.shape[0]
+    num_views = viewmats.shape[0]
 
+    # Test if gsplat works
+    sh_full = torch.cat([sh0, shN], dim=1)
     gsplat_result = try_gsplat_render(
-        means, scales, quats, opacities, colors,
-        viewmats[:1], Ks[:1], IMAGE_SIZE, IMAGE_SIZE, device
+        means, scales, quats, opacities, sh_full,
+        viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE, device,
+        sh_degree=sh_degree,
     )
     use_gsplat = gsplat_result is not None
 
-    print(f"  Using {'gsplat' if use_gsplat else 'simple'} renderer{'' if use_gsplat else ' (slower)'}")
+    print(f"  Using {'gsplat' if use_gsplat else 'simple'} renderer "
+          f"(SH degree {sh_degree}){'' if use_gsplat else ' (slower)'}")
 
     for iteration in range(num_iterations):
         optimizer.zero_grad()
 
+        # Concatenate SH coefficients
+        sh_full = torch.cat([sh0, shN], dim=1)
+
         if use_gsplat:
             result = try_gsplat_render(
-                means, scales, quats, opacities, colors,
-                viewmats, Ks, IMAGE_SIZE, IMAGE_SIZE, device
+                means, scales, quats, opacities, sh_full,
+                viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE, device,
+                sh_degree=sh_degree,
             )
             if result is None:
                 use_gsplat = False
@@ -208,15 +256,16 @@ def train_gaussians(images: List[torch.Tensor],
             target_rgb_batch = target_rgb
             target_alpha_batch = target_alpha
         else:
-            view_indices = torch.randperm(C)[:min(MAX_VIEWS_PER_ITERATION, C)]
+            view_indices = torch.randperm(num_views)[:min(MAX_VIEWS_PER_ITERATION, num_views)]
 
             render_colors_list = []
             render_alphas_list = []
 
             for vi in view_indices:
                 rc, ra = render_gaussians_simple(
-                    means, scales, quats, opacities, colors,
-                    viewmats[vi], Ks[vi], IMAGE_SIZE, IMAGE_SIZE
+                    means, scales, quats, opacities, sh_full,
+                    viewmats[vi], intrinsics[vi], IMAGE_SIZE, IMAGE_SIZE,
+                    sh_degree=sh_degree,
                 )
                 render_colors_list.append(rc)
                 render_alphas_list.append(ra)
@@ -248,8 +297,11 @@ def train_gaussians(images: List[torch.Tensor],
             print(f"  Iter {iteration}: loss={loss.item():.4f}, "
                   f"rgb={rgb_loss.item():.4f}, alpha={alpha_loss.item():.4f}")
 
+    # Reconstruct full SH coefficients
+    sh_coeffs_out = torch.cat([sh0, shN], dim=1)
+
     return (means.detach().cpu(), scales.detach().cpu(), quats.detach().cpu(),
-            opacities.detach().cpu(), colors.detach().cpu())
+            opacities.detach().cpu(), sh_coeffs_out.detach().cpu())
 
 
 def main() -> None:
@@ -290,15 +342,15 @@ def main() -> None:
     points = carve_visual_hull(images, cameras, resolution=args.resolution)
 
     print("Initializing Gaussians...")
-    means, scales, quats, opacities, colors = init_gaussians(
+    means, scales, quats, opacities, sh_coeffs = init_gaussians(
         points, images, cameras, num_gaussians=args.num_gaussians
     )
-    print(f"  Initialized {means.shape[0]} Gaussians")
+    print(f"  Initialized {means.shape[0]} Gaussians (SH degree {SH_DEGREE})")
 
     print(f"Training for {args.iterations} iterations...")
-    means, scales, quats, opacities, colors = train_gaussians(
+    means, scales, quats, opacities, sh_coeffs = train_gaussians(
         images, cameras,
-        means, scales, quats, opacities, colors,
+        means, scales, quats, opacities, sh_coeffs,
         num_iterations=args.iterations,
         lr=args.lr,
         device=args.device,
@@ -306,7 +358,7 @@ def main() -> None:
 
     output_path = project_dir / args.output
     print(f"Exporting to {output_path}...")
-    export_ply(means, scales, quats, opacities, colors, str(output_path))
+    export_ply(means, scales, quats, opacities, sh_coeffs, str(output_path))
 
     print("Done!")
 

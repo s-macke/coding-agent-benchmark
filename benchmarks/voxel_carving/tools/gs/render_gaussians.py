@@ -22,22 +22,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR
+from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR, SH_DEGREE
 from .ply import load_ply
 from .sprites import load_sprites
 from .camera import CameraCollection, PerspectiveCamera
 from .render import try_gsplat_render
+from .sh import eval_sh
+
+import torch.nn.functional as F
 
 
 def render_points_fast(
     means: torch.Tensor,
     opacities: torch.Tensor,
-    colors: torch.Tensor,
+    sh_coeffs: torch.Tensor,
     viewmat: torch.Tensor,
     K: torch.Tensor,
     width: int,
     height: int,
     perspective: bool = False,
+    sh_degree: int = SH_DEGREE,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Fast point-based renderer using scatter_add (fully vectorized).
@@ -45,14 +49,33 @@ def render_points_fast(
     Renders gaussians as colored points with depth sorting.
 
     Args:
-        perspective: If True, use perspective projection (divide by depth).
-                    If False, use orthographic projection.
+        means: [N, 3] Gaussian positions
+        opacities: [N] logit opacities
+        sh_coeffs: [N, K, 3] SH coefficients
+        viewmat: [4, 4] view matrix
+        K: [3, 3] intrinsic matrix
+        width: image width
+        height: image height
+        perspective: If True, use perspective projection
+        sh_degree: SH degree for evaluation
     """
     device = means.device
-    N = means.shape[0]
+    n = means.shape[0]
+
+    # Compute camera position for SH evaluation
+    rot = viewmat[:3, :3]
+    trans = viewmat[:3, 3]
+    camera_pos = -rot.T @ trans
+
+    # Compute viewing directions (Gaussian to camera)
+    view_dirs = camera_pos.unsqueeze(0) - means  # [N, 3]
+    view_dirs = F.normalize(view_dirs, dim=-1)
+
+    # Evaluate SH to get colors
+    colors = eval_sh(sh_coeffs, view_dirs, degree=sh_degree)  # [N, 3]
 
     # Transform to camera space
-    means_homo = torch.cat([means, torch.ones(N, 1, device=device)], dim=1)
+    means_homo = torch.cat([means, torch.ones(n, 1, device=device)], dim=1)
     cam_means = (viewmat @ means_homo.T).T[:, :3]
 
     fx, fy = K[0, 0], K[1, 1]
@@ -106,9 +129,10 @@ def render_all_views(
     scales: torch.Tensor,
     quats: torch.Tensor,
     opacities: torch.Tensor,
-    colors: torch.Tensor,
+    sh_coeffs: torch.Tensor,
     cameras: CameraCollection,
     device: str = 'cuda',
+    sh_degree: int = SH_DEGREE,
 ) -> List[torch.Tensor]:
     """Render gaussian splats from all camera angles."""
     if device == 'cuda' and not torch.cuda.is_available():
@@ -121,27 +145,28 @@ def render_all_views(
     scales = scales.to(device)
     quats = quats.to(device)
     opacities = opacities.to(device)
-    colors = colors.to(device)
+    sh_coeffs = sh_coeffs.to(device)
 
     # Get stacked tensors for batch rendering
     viewmats = cameras.viewmats.to(device)
-    Ks = cameras.Ks.to(device)
+    intrinsics = cameras.Ks.to(device)
 
     # Detect if using perspective cameras
     use_perspective = len(cameras) > 0 and isinstance(cameras[0], PerspectiveCamera)
 
     # Check if gsplat works
     gsplat_result = try_gsplat_render(
-        means, scales, quats, opacities, colors,
-        viewmats[:1], Ks[:1], IMAGE_SIZE, IMAGE_SIZE, device
+        means, scales, quats, opacities, sh_coeffs,
+        viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE, device,
+        sh_degree=sh_degree,
     )
     use_gsplat = gsplat_result is not None
 
     if use_gsplat:
-        print("  Using gsplat renderer")
+        print(f"  Using gsplat renderer (SH degree {sh_degree})")
     else:
         proj_type = "perspective" if use_perspective else "orthographic"
-        print(f"  Using fast point renderer ({proj_type}, gsplat not available)")
+        print(f"  Using fast point renderer ({proj_type}, SH degree {sh_degree})")
 
     renders = []
     num_views = len(cameras)
@@ -149,8 +174,9 @@ def render_all_views(
     if use_gsplat:
         # Render all views at once with gsplat
         result = try_gsplat_render(
-            means, scales, quats, opacities, colors,
-            viewmats, Ks, IMAGE_SIZE, IMAGE_SIZE, device
+            means, scales, quats, opacities, sh_coeffs,
+            viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE, device,
+            sh_degree=sh_degree,
         )
         if result is not None:
             render_colors, render_alphas = result
@@ -167,9 +193,10 @@ def render_all_views(
             viewmat = camera.viewmat.to(device)
             K = camera.K.to(device)
             rgb, alpha = render_points_fast(
-                means, opacities, colors,
+                means, opacities, sh_coeffs,
                 viewmat, K, IMAGE_SIZE, IMAGE_SIZE,
                 perspective=use_perspective,
+                sh_degree=sh_degree,
             )
             rgba = torch.cat([rgb, alpha], dim=-1)
             renders.append(rgba.cpu())
@@ -240,8 +267,8 @@ def main() -> None:
     # Load gaussians from PLY
     ply_path = project_dir / args.input
     print(f"Loading gaussians from {ply_path}...")
-    means, scales, quats, opacities, colors = load_ply(str(ply_path))
-    print(f"  Loaded {means.shape[0]} gaussians")
+    means, scales, quats, opacities, sh_coeffs = load_ply(str(ply_path))
+    print(f"  Loaded {means.shape[0]} gaussians ({sh_coeffs.shape[1]} SH coefficients)")
 
     # Load original sprites and camera data
     print("Loading sprites and camera data...")
@@ -264,7 +291,7 @@ def main() -> None:
     # Render all views
     print("Rendering gaussian splats...")
     renders = render_all_views(
-        means, scales, quats, opacities, colors,
+        means, scales, quats, opacities, sh_coeffs,
         cameras, device=args.device
     )
 
