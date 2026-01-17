@@ -178,7 +178,7 @@ def train_gaussians(
         with torch.no_grad():
             quats.data = F.normalize(quats.data, dim=-1)
 
-        if iteration % LOG_INTERVAL == 0:
+        if iteration % LOG_INTERVAL == 0 or iteration == config.num_iterations - 1:
             print(f"  Iter {iteration}: loss={loss.item():.4f}, "
                   f"rgb={rgb_loss.item():.4f}, alpha={alpha_loss.item():.4f}")
 

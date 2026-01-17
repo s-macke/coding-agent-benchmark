@@ -1,6 +1,6 @@
 """Gaussian splatting package for sprite-to-3DGS conversion."""
 
-from .constants import IMAGE_SIZE, ALPHA_THRESHOLD
+from .constants import ALPHA_THRESHOLD
 from .gaussians import SH_C0, SH_DEGREE
 from .sprites import load_sprites
 from .camera import (
@@ -16,7 +16,6 @@ from .gaussians import eval_sh, rgb_to_sh, sh_to_rgb, init_sh_from_rgb
 
 __all__ = [
     # Constants
-    'IMAGE_SIZE',
     'SH_C0',
     'SH_DEGREE',
     'ALPHA_THRESHOLD',

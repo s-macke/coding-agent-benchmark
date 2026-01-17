@@ -8,7 +8,6 @@ import torch
 from .base import Camera
 from .orthographic import OrthographicCamera
 from .perspective import PerspectiveCamera
-from ..constants import IMAGE_SIZE
 
 if TYPE_CHECKING:
     from ..sprites import SpriteData
@@ -115,8 +114,8 @@ class CameraCollection:
         near: float = 0.1,
         far: float = 100.0,
         distance: float = 5.0,
-        width: int = IMAGE_SIZE,
-        height: int = IMAGE_SIZE,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
     ) -> "CameraCollection":
         """Build camera collection from sprite data.
 
@@ -128,12 +127,21 @@ class CameraCollection:
             near: (perspective only) near clipping plane distance
             far: (perspective only) far clipping plane distance
             distance: camera distance from origin
-            width: image width in pixels
-            height: image height in pixels
+            width: image width in pixels (default: infer from first sprite)
+            height: image height in pixels (default: infer from first sprite)
 
         Returns:
             CameraCollection with camera instances of the specified type
         """
+        if not sprites:
+            raise ValueError("sprites list cannot be empty")
+
+        # Infer size from first sprite's image if not provided
+        if width is None:
+            width = sprites[0].image.width
+        if height is None:
+            height = sprites[0].image.height
+
         cameras = []
         for sprite in sprites:
             if camera_type == CameraType.ORTHOGRAPHIC:
