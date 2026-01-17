@@ -23,6 +23,7 @@ import numpy as np
 import torch
 
 from .cameras import Cameras
+from .camera import CameraCollection
 from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR
 from .device import get_device
 from .gaussians import Gaussians
