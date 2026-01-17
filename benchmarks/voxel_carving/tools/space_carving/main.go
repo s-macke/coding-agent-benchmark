@@ -9,6 +9,7 @@ import (
 
 	"voxelcarve/camera"
 	"voxelcarve/common"
+	"voxelcarve/export"
 	"voxelcarve/voxelgrid"
 )
 
@@ -145,13 +146,13 @@ func main() {
 	fmt.Printf("Exporting %d colored voxels to %s...\n", grid.OccupiedCount(), *outputPath)
 	if *vox {
 		fmt.Println("  Format: MagicaVoxel .vox")
-		err = ExportVOX(grid, *outputPath)
+		err = export.ExportVOX(grid, *outputPath)
 	} else if *mesh {
 		fmt.Println("  Format: PLY mesh (cubes with faces)")
-		err = ExportMeshPLY(grid, *outputPath)
+		err = export.ExportMeshPLY(grid, *outputPath)
 	} else {
 		fmt.Println("  Format: PLY point cloud")
-		err = ExportColoredPLY(grid, *outputPath)
+		err = export.ExportColoredPLY(grid, *outputPath)
 	}
 	if err != nil {
 		fatalf("Error exporting: %v", err)
