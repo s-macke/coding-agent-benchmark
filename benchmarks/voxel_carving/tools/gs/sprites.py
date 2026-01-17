@@ -56,13 +56,15 @@ def load_sprites(json_path: Path, images_dir: Path) -> List[SpriteData]:
     for sprite in data['sprites']:
         img_path = images_dir / sprite['filename']
         img = Image.open(img_path).convert('RGBA')
+        # Scale by 2x with bilinear interpolation
+        # img = img.resize((img.width * 1, img.height * 1), Image.Resampling.BILINEAR)
 
         sprites.append(SpriteData(
             block=sprite['block'],
             yaw=sprite['yaw'],
             pitch=sprite['pitch'],
-            width=sprite['width'],
-            height=sprite['height'],
+            width=sprite['width'] * 1,
+            height=sprite['height'] * 1,
             x=sprite['x'],
             y=sprite['y'],
             filename=sprite['filename'],
