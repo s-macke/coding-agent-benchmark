@@ -42,7 +42,6 @@ SHN_LR_MULTIPLIER = 0.0125  # Higher-order SH (1/20 of SH0, from gsplat)
 ALPHA_LOSS_WEIGHT = 0.5
 OPACITY_REG_WEIGHT = 0.01
 LOG_INTERVAL = 500
-MAX_VIEWS_PER_ITERATION = 8
 
 # Camera pose optimization constants
 POSE_OPT_LR = 1e-5  # Base learning rate for pose optimization
@@ -140,61 +139,29 @@ def train_gaussians(
         sh_full = torch.cat([sh0, shN], dim=1)
         current_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
 
+        # Apply pose adjustment if enabled
+        current_cams = cams
+        if pose_adjust is not None:
+            camera_ids = torch.arange(num_views, device=device)
+            adjusted_viewmats = pose_adjust.forward_viewmats(cams.viewmats, camera_ids)
+            current_cams = Cameras(
+                viewmats=adjusted_viewmats,
+                Ks=cams.Ks,
+                camera_model=cams.camera_model,
+                width=cams.width,
+                height=cams.height,
+            )
+
         if use_gsplat:
-            # Apply pose adjustment if enabled
-            current_cams = cams
-            if pose_adjust is not None:
-                camera_ids = torch.arange(num_views, device=device)
-                adjusted_viewmats = pose_adjust.forward_viewmats(cams.viewmats, camera_ids)
-                current_cams = Cameras(
-                    viewmats=adjusted_viewmats,
-                    Ks=cams.Ks,
-                    camera_model=cams.camera_model,
-                    width=cams.width,
-                    height=cams.height,
-                )
-
-            result = render_gsplat(current_gaussians, current_cams)
-            render_colors, render_alphas = result
-            target_rgb_batch = target_rgb
-            target_alpha_batch = target_alpha
+            render_colors, render_alphas = render_gsplat(current_gaussians, current_cams)
         else:
-            view_indices = torch.randperm(num_views)[:min(MAX_VIEWS_PER_ITERATION, num_views)]
+            render_colors, render_alphas = render_gaussians_simple(current_gaussians, current_cams)
 
-            render_colors_list = []
-            render_alphas_list = []
-
-            for vi in view_indices:
-                # Apply pose adjustment if enabled
-                current_viewmat = cams.viewmats[vi]
-                if pose_adjust is not None:
-                    camera_id = torch.tensor(vi.item(), device=device)
-                    current_viewmat = pose_adjust.forward_viewmats(
-                        cams.viewmats[vi].unsqueeze(0), camera_id.unsqueeze(0)
-                    ).squeeze(0)
-
-                # Create single-camera Cameras object
-                single_cam = Cameras(
-                    viewmats=current_viewmat.unsqueeze(0),
-                    Ks=cams.Ks[vi].unsqueeze(0),
-                    camera_model=cams.camera_model,
-                    width=cams.width,
-                    height=cams.height,
-                )
-                rc, ra = render_gaussians_simple(current_gaussians, single_cam)
-                render_colors_list.append(rc)
-                render_alphas_list.append(ra)
-
-            render_colors = torch.stack(render_colors_list)
-            render_alphas = torch.stack(render_alphas_list)
-            target_rgb_batch = target_rgb[view_indices]
-            target_alpha_batch = target_alpha[view_indices]
-
-        rgb_loss = (torch.abs(render_colors - target_rgb_batch) * target_alpha_batch).mean()
+        rgb_loss = (torch.abs(render_colors - target_rgb) * target_alpha).mean()
 
         alpha_loss = F.binary_cross_entropy(
             render_alphas.clamp(CLAMP_EPSILON, 1 - CLAMP_EPSILON),
-            target_alpha_batch,
+            target_alpha,
             reduction='mean'
         )
 

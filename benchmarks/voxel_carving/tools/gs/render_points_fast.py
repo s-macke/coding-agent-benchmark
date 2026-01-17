@@ -10,34 +10,19 @@ from .gaussians import Gaussians, eval_sh
 from .projection import project_points
 
 
-def render_points_fast(
+def _render_single(
     gaussians: Gaussians,
-    cameras: Cameras,
+    viewmat: torch.Tensor,
+    K: torch.Tensor,
+    width: int,
+    height: int,
+    is_perspective: bool,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Fast point-based renderer using scatter_add (fully vectorized).
-
-    Renders gaussians as colored points with depth sorting.
-    Renders the first camera in the Cameras batch.
-
-    Args:
-        gaussians: Gaussians object with means, opacities, sh_coeffs
-        cameras: Cameras object (uses first camera if batch)
-
-    Returns:
-        render_rgb: [H, W, 3]
-        render_alpha: [H, W, 1]
-    """
+    """Render a single camera view."""
     means = gaussians.means
     opacities = gaussians.opacities
     sh_coeffs = gaussians.sh_coeffs
     sh_degree = gaussians.sh_degree
-
-    # Get single camera
-    viewmat = cameras.viewmats[0] if cameras.viewmats.dim() == 3 else cameras.viewmats
-    K = cameras.Ks[0] if cameras.Ks.dim() == 3 else cameras.Ks
-    width = cameras.width
-    height = cameras.height
 
     device = means.device
     n = means.shape[0]
@@ -59,7 +44,7 @@ def render_points_fast(
     cam_means = (viewmat @ means_homo.T).T[:, :3]
 
     # Project to pixel coordinates
-    proj_x, proj_y = project_points(cam_means, K, cameras.is_perspective)
+    proj_x, proj_y = project_points(cam_means, K, is_perspective)
     proj_x = proj_x.long()
     proj_y = proj_y.long()
     depths = -cam_means[:, 2]
@@ -94,3 +79,47 @@ def render_points_fast(
     render_alpha = flat_alpha.view(height, width, 1)
 
     return render_rgb, render_alpha
+
+
+def render_points_fast(
+    gaussians: Gaussians,
+    cameras: Cameras,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Fast point-based renderer using scatter_add (fully vectorized).
+
+    Renders gaussians as colored points with depth sorting.
+    Supports batched cameras.
+
+    Args:
+        gaussians: Gaussians object with means, opacities, sh_coeffs
+        cameras: Cameras object (single or batch)
+
+    Returns:
+        render_rgb: [N, H, W, 3] for batched, [H, W, 3] for single
+        render_alpha: [N, H, W, 1] for batched, [H, W, 1] for single
+    """
+    width = cameras.width
+    height = cameras.height
+    is_perspective = cameras.is_perspective
+
+    # Check if batched
+    if cameras.viewmats.dim() == 2:
+        # Single camera
+        return _render_single(
+            gaussians, cameras.viewmats, cameras.Ks, width, height, is_perspective
+        )
+
+    # Batched cameras
+    num_cameras = cameras.viewmats.shape[0]
+    results_rgb = []
+    results_alpha = []
+
+    for i in range(num_cameras):
+        rgb, alpha = _render_single(
+            gaussians, cameras.viewmats[i], cameras.Ks[i], width, height, is_perspective
+        )
+        results_rgb.append(rgb)
+        results_alpha.append(alpha)
+
+    return torch.stack(results_rgb), torch.stack(results_alpha)
