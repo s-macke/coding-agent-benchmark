@@ -15,12 +15,14 @@ Options:
 """
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from .cameras import Cameras
 from .camera import CameraCollection
@@ -32,7 +34,40 @@ from .sprites import load_cameras
 from .render import try_gsplat_render
 from .sh import eval_sh
 
-import torch.nn.functional as F
+
+@dataclass
+class RenderArgs:
+    """Command-line arguments for rendering."""
+    input: str
+    output: str
+    device: str
+    camera_type: str
+    ortho_scale: float
+    fov: float
+
+
+def parse_args() -> RenderArgs:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description='Render Gaussian Splats from PLY')
+    parser.add_argument('--input', default='ship_gaussians.ply', help='Input PLY file')
+    parser.add_argument('--output', default='gaussians_comparison.png', help='Output image')
+    parser.add_argument('--device', default='cuda', help='Device (cuda or cpu)')
+    parser.add_argument('--camera-type', choices=['orthographic', 'perspective'],
+                        default='orthographic', help='Camera projection type')
+    parser.add_argument('--ortho-scale', type=float, default=2.0,
+                        help='Orthographic scale (only for orthographic camera)')
+    parser.add_argument('--fov', type=float, default=60.0,
+                        help='Field of view in degrees (only for perspective camera)')
+    args = parser.parse_args()
+
+    return RenderArgs(
+        input=args.input,
+        output=args.output,
+        device=args.device,
+        camera_type=args.camera_type,
+        ortho_scale=args.ortho_scale,
+        fov=args.fov,
+    )
 
 
 def render_points_fast(
@@ -219,18 +254,7 @@ def create_comparison_grid(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Render Gaussian Splats from PLY')
-    parser.add_argument('--input', default='ship_gaussians.ply', help='Input PLY file')
-    parser.add_argument('--output', default='gaussians_comparison.png', help='Output image')
-    parser.add_argument('--device', default='cuda', help='Device (cuda or cpu)')
-    parser.add_argument('--camera-type', choices=['orthographic', 'perspective'],
-                        default='orthographic', help='Camera projection type')
-    parser.add_argument('--ortho-scale', type=float, default=2.0,
-                        help='Orthographic scale (only for orthographic camera)')
-    parser.add_argument('--fov', type=float, default=60.0,
-                        help='Field of view in degrees (only for perspective camera)')
-    args = parser.parse_args()
-
+    args = parse_args()
     project_dir = Path(__file__).parent.parent.parent
 
     # Load gaussians from PLY

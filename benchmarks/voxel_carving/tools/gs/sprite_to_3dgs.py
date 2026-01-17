@@ -17,9 +17,7 @@ Options:
     --fov FLOAT         Perspective field of view in degrees (default: 60.0)
 """
 
-import argparse
 from pathlib import Path
-from typing import List
 
 import torch
 import torch.nn.functional as F
@@ -32,6 +30,7 @@ from .ply import export_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule
 from .render import render_gaussians_simple, try_gsplat_render
+from .train_args import TrainConfig, parse_args
 from .voxel_carving import initialize_from_visual_hull
 
 # Training constants
@@ -54,34 +53,25 @@ CLAMP_EPSILON = 1e-6
 
 
 def train_gaussians(
-    images: List[torch.Tensor],
     cameras: CameraCollection,
     init_gaussians: Gaussians,
-    num_iterations: int = 5000,
-    lr: float = 0.01,
-    device: str = 'cuda',
-    pose_opt: bool = False,
-    fix_positions: bool = False,
+    config: TrainConfig,
 ) -> Gaussians:
     """
     Optimize Gaussian parameters to match target sprite views.
 
     Args:
-        images: list of [H, W, 4] target RGBA images
-        cameras: camera collection
+        cameras: camera collection with images
         init_gaussians: initial Gaussians to optimize
-        num_iterations: training iterations
-        lr: base learning rate
-        device: cuda or cpu
-        pose_opt: if True, also optimize camera poses
-        fix_positions: if True, keep Gaussian positions fixed
+        config: training configuration
 
     Returns:
         Optimized Gaussians object
     """
-    device = get_device(device)
+    device = get_device(config.device)
     sh_degree = init_gaussians.sh_degree
 
+    images = cameras.images
     targets = torch.stack(images).to(device)
     target_rgb = targets[:, :, :, :3]
     target_alpha = targets[:, :, :, 3:4]
@@ -90,7 +80,7 @@ def train_gaussians(
     cams = cameras.to_cameras().to(device)
 
     means = init_gaussians.means.clone().to(device)
-    if not fix_positions:
+    if not config.fix_positions:
         means.requires_grad_(True)
     scales = init_gaussians.scales.clone().to(device).requires_grad_(True)
     quats = init_gaussians.quats.clone().to(device).requires_grad_(True)
@@ -103,14 +93,14 @@ def train_gaussians(
 
     # Build optimizer param groups
     param_groups = [
-        {'params': scales, 'lr': lr * SCALE_LR_MULTIPLIER},
-        {'params': quats, 'lr': lr * QUAT_LR_MULTIPLIER},
-        {'params': opacities, 'lr': lr * OPACITY_LR_MULTIPLIER},
-        {'params': sh0, 'lr': lr * SH0_LR_MULTIPLIER},
-        {'params': shN, 'lr': lr * SHN_LR_MULTIPLIER},
+        {'params': scales, 'lr': config.lr * SCALE_LR_MULTIPLIER},
+        {'params': quats, 'lr': config.lr * QUAT_LR_MULTIPLIER},
+        {'params': opacities, 'lr': config.lr * OPACITY_LR_MULTIPLIER},
+        {'params': sh0, 'lr': config.lr * SH0_LR_MULTIPLIER},
+        {'params': shN, 'lr': config.lr * SHN_LR_MULTIPLIER},
     ]
-    if not fix_positions:
-        param_groups.insert(0, {'params': means, 'lr': lr})
+    if not config.fix_positions:
+        param_groups.insert(0, {'params': means, 'lr': config.lr})
     else:
         print("  Gaussian positions fixed")
 
@@ -121,7 +111,7 @@ def train_gaussians(
     # Setup camera pose optimization if enabled
     pose_adjust = None
     pose_optimizer = None
-    if pose_opt:
+    if config.pose_opt:
         import math
         pose_adjust = CameraOptModule(num_views).to(device)
         pose_adjust.zero_init()
@@ -141,7 +131,7 @@ def train_gaussians(
     print(f"  Using {'gsplat' if use_gsplat else 'simple'} renderer "
           f"(SH degree {sh_degree}){'' if use_gsplat else ' (slower)'}")
 
-    for iteration in range(num_iterations):
+    for iteration in range(config.num_iterations):
         optimizer.zero_grad()
         if pose_optimizer is not None:
             pose_optimizer.zero_grad()
@@ -240,25 +230,7 @@ def train_gaussians(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Convert sprites to 3D Gaussian Splatting')
-    parser.add_argument('--output', default='ship_gaussians.ply', help='Output PLY file')
-    parser.add_argument('--iterations', type=int, default=5000, help='Training iterations')
-    parser.add_argument('--num-gaussians', type=int, default=5000, help='Max Gaussian count')
-    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
-    parser.add_argument('--resolution', type=int, default=64, help='Voxel grid resolution')
-    parser.add_argument('--device', default='cuda', help='Device (cuda or cpu)')
-    parser.add_argument('--camera-type', choices=['orthographic', 'perspective'],
-                        default='orthographic', help='Camera projection type')
-    parser.add_argument('--ortho-scale', type=float, default=2.0,
-                        help='Orthographic scale (only for orthographic camera)')
-    parser.add_argument('--fov', type=float, default=60.0,
-                        help='Field of view in degrees (only for perspective camera)')
-    parser.add_argument('--pose-opt', action='store_true',
-                        help='Enable camera pose optimization during training')
-    parser.add_argument('--fix-positions', action='store_true',
-                        help='Keep Gaussian positions fixed during training')
-    args = parser.parse_args()
-
+    args = parse_args()
     project_dir = Path(__file__).parent.parent.parent
 
     print("Loading sprites and cameras...")
@@ -277,15 +249,8 @@ def main() -> None:
         num_gaussians=args.num_gaussians,
     )
 
-    print(f"Training for {args.iterations} iterations...")
-    gaussians = train_gaussians(
-        cameras.images, cameras, gaussians,
-        num_iterations=args.iterations,
-        lr=args.lr,
-        device=args.device,
-        pose_opt=args.pose_opt,
-        fix_positions=args.fix_positions,
-    )
+    print(f"Training for {args.train.num_iterations} iterations...")
+    gaussians = train_gaussians(cameras, gaussians, args.train)
 
     output_path = project_dir / args.output
     print(f"Exporting to {output_path}...")
