@@ -29,7 +29,8 @@ from .gaussians import Gaussians
 from .ply import export_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule
-from .render import render_gaussians_simple, try_gsplat_render
+from .render_simple import render_gaussians_simple
+from .render_gsplat import try_gsplat_render
 from .train_args import TrainConfig, parse_args
 from .voxel_carving import initialize_from_visual_hull
 
