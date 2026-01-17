@@ -22,7 +22,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR, SH_DEGREE
+from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR
+from .device import get_device
+from .gaussians import Gaussians
 from .ply import load_ply
 from .sprites import load_sprites
 from .camera import CameraCollection, PerspectiveCamera
@@ -33,15 +35,12 @@ import torch.nn.functional as F
 
 
 def render_points_fast(
-    means: torch.Tensor,
-    opacities: torch.Tensor,
-    sh_coeffs: torch.Tensor,
+    gaussians: Gaussians,
     viewmat: torch.Tensor,
     K: torch.Tensor,
     width: int,
     height: int,
     perspective: bool = False,
-    sh_degree: int = SH_DEGREE,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Fast point-based renderer using scatter_add (fully vectorized).
@@ -49,16 +48,18 @@ def render_points_fast(
     Renders gaussians as colored points with depth sorting.
 
     Args:
-        means: [N, 3] Gaussian positions
-        opacities: [N] logit opacities
-        sh_coeffs: [N, K, 3] SH coefficients
+        gaussians: Gaussians object with means, opacities, sh_coeffs
         viewmat: [4, 4] view matrix
         K: [3, 3] intrinsic matrix
         width: image width
         height: image height
         perspective: If True, use perspective projection
-        sh_degree: SH degree for evaluation
     """
+    means = gaussians.means
+    opacities = gaussians.opacities
+    sh_coeffs = gaussians.sh_coeffs
+    sh_degree = gaussians.sh_degree
+
     device = means.device
     n = means.shape[0]
 
@@ -125,27 +126,15 @@ def render_points_fast(
 
 
 def render_all_views(
-    means: torch.Tensor,
-    scales: torch.Tensor,
-    quats: torch.Tensor,
-    opacities: torch.Tensor,
-    sh_coeffs: torch.Tensor,
+    gaussians: Gaussians,
     cameras: CameraCollection,
     device: str = 'cuda',
-    sh_degree: int = SH_DEGREE,
 ) -> List[torch.Tensor]:
     """Render gaussian splats from all camera angles."""
-    if device == 'cuda' and not torch.cuda.is_available():
-        print("  CUDA not available, using CPU")
-        device = 'cpu'
+    device = get_device(device)
 
-    device = torch.device(device)
-
-    means = means.to(device)
-    scales = scales.to(device)
-    quats = quats.to(device)
-    opacities = opacities.to(device)
-    sh_coeffs = sh_coeffs.to(device)
+    g = gaussians.to(device)
+    sh_degree = g.sh_degree
 
     # Get stacked tensors for batch rendering
     viewmats = cameras.viewmats.to(device)
@@ -156,9 +145,7 @@ def render_all_views(
 
     # Check if gsplat works
     gsplat_result = try_gsplat_render(
-        means, scales, quats, opacities, sh_coeffs,
-        viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE, device,
-        sh_degree=sh_degree,
+        g, viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE,
     )
     use_gsplat = gsplat_result is not None
 
@@ -174,9 +161,7 @@ def render_all_views(
     if use_gsplat:
         # Render all views at once with gsplat
         result = try_gsplat_render(
-            means, scales, quats, opacities, sh_coeffs,
-            viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE, device,
-            sh_degree=sh_degree,
+            g, viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE,
         )
         if result is not None:
             render_colors, render_alphas = result
@@ -193,10 +178,8 @@ def render_all_views(
             viewmat = camera.viewmat.to(device)
             K = camera.K.to(device)
             rgb, alpha = render_points_fast(
-                means, opacities, sh_coeffs,
-                viewmat, K, IMAGE_SIZE, IMAGE_SIZE,
+                g, viewmat, K, IMAGE_SIZE, IMAGE_SIZE,
                 perspective=use_perspective,
-                sh_degree=sh_degree,
             )
             rgba = torch.cat([rgb, alpha], dim=-1)
             renders.append(rgba.cpu())
@@ -267,8 +250,8 @@ def main() -> None:
     # Load gaussians from PLY
     ply_path = project_dir / args.input
     print(f"Loading gaussians from {ply_path}...")
-    means, scales, quats, opacities, sh_coeffs = load_ply(str(ply_path))
-    print(f"  Loaded {means.shape[0]} gaussians ({sh_coeffs.shape[1]} SH coefficients)")
+    gaussians = load_ply(str(ply_path))
+    print(f"  Loaded {gaussians.num_gaussians} gaussians ({gaussians.sh_coeffs.shape[1]} SH coefficients)")
 
     # Load original sprites and camera data
     print("Loading sprites and camera data...")
@@ -290,10 +273,7 @@ def main() -> None:
 
     # Render all views
     print("Rendering gaussian splats...")
-    renders = render_all_views(
-        means, scales, quats, opacities, sh_coeffs,
-        cameras, device=args.device
-    )
+    renders = render_all_views(gaussians, cameras, device=args.device)
 
     # Create comparison grid
     output_path = project_dir / args.output

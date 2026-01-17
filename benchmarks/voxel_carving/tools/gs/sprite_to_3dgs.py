@@ -19,17 +19,20 @@ Options:
 
 import argparse
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import torch
 import torch.nn.functional as F
 
 from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SPRITES_JSON, SPRITES_DIR, SH_DEGREE
+from .device import get_device
+from .gaussians import Gaussians
 from .ply import export_ply
 from .sprites import load_sprites
 from .camera import CameraCollection, CameraOptModule
 from .render import render_gaussians_simple, try_gsplat_render
 from .sh import init_sh_from_rgb
+from .voxel_carving import carve_visual_hull
 
 # Gaussian initialization constants
 INITIAL_LOG_SCALE = -3.5  # exp(-3.5) ~ 0.03
@@ -54,53 +57,13 @@ POSE_OPT_WEIGHT_DECAY = 1e-6  # Regularization for pose parameters
 CLAMP_EPSILON = 1e-6
 
 
-def carve_visual_hull(images: List[torch.Tensor],
-                      cameras: CameraCollection,
-                      resolution: int = 64,
-                      extent: float = 1.5) -> torch.Tensor:
-    """
-    Carve visual hull from silhouettes using camera projection.
-
-    Returns:
-        points: [N, 3] 3D points inside visual hull
-    """
-    coords = torch.linspace(-extent, extent, resolution)
-    grid_x, grid_y, grid_z = torch.meshgrid(coords, coords, coords, indexing='ij')
-    grid = torch.stack([grid_x, grid_y, grid_z], dim=-1).reshape(-1, 3)
-
-    occupied = torch.ones(grid.shape[0], dtype=torch.bool)
-
-    print(f"  Carving with {len(cameras)} views...")
-
-    for img, camera in zip(images, cameras):
-        mask = img[:, :, 3] > ALPHA_THRESHOLD
-        H, W = mask.shape
-
-        proj_x, proj_y = camera.project(grid)
-
-        in_bounds = (proj_x >= 0) & (proj_x < W - 1) & (proj_y >= 0) & (proj_y < H - 1)
-
-        px = proj_x.long().clamp(0, W - 1)
-        py = proj_y.long().clamp(0, H - 1)
-
-        in_silhouette = torch.zeros(grid.shape[0], dtype=torch.bool)
-        in_silhouette[in_bounds] = mask[py[in_bounds], px[in_bounds]]
-
-        occupied = occupied & in_silhouette
-
-    points = grid[occupied]
-    print(f"  Visual hull: {points.shape[0]} voxels occupied out of {grid.shape[0]}")
-
-    return points
-
-
 def init_gaussians(
     points: torch.Tensor,
     images: List[torch.Tensor],
     cameras: CameraCollection,
     num_gaussians: int = 5000,
     sh_degree: int = SH_DEGREE,
-) -> Tuple[torch.Tensor, ...]:
+) -> Gaussians:
     """
     Initialize Gaussian parameters from point cloud.
 
@@ -112,11 +75,7 @@ def init_gaussians(
         sh_degree: spherical harmonics degree
 
     Returns:
-        means: [N, 3] positions
-        scales: [N, 3] log-scales
-        quats: [N, 4] quaternions (wxyz)
-        opacities: [N] logit opacities
-        sh_coeffs: [N, K, 3] SH coefficients where K = (sh_degree+1)^2
+        Gaussians object with initialized parameters
     """
     if points.shape[0] > num_gaussians:
         idx = torch.randperm(points.shape[0])[:num_gaussians]
@@ -162,47 +121,43 @@ def init_gaussians(
     # Convert RGB to SH coefficients (DC term only, higher orders = 0)
     sh_coeffs = init_sh_from_rgb(colors, sh_degree=sh_degree)
 
-    return means, scales, quats, opacities, sh_coeffs
+    return Gaussians(
+        means=means,
+        scales=scales,
+        quats=quats,
+        opacities=opacities,
+        sh_coeffs=sh_coeffs,
+    )
 
 
 def train_gaussians(
     images: List[torch.Tensor],
     cameras: CameraCollection,
-    init_means: torch.Tensor,
-    init_scales: torch.Tensor,
-    init_quats: torch.Tensor,
-    init_opacities: torch.Tensor,
-    init_sh_coeffs: torch.Tensor,
+    init_gaussians: Gaussians,
     num_iterations: int = 5000,
     lr: float = 0.01,
-    sh_degree: int = SH_DEGREE,
     device: str = 'cuda',
     pose_opt: bool = False,
     fix_positions: bool = False,
-) -> Tuple[torch.Tensor, ...]:
+) -> Gaussians:
     """
     Optimize Gaussian parameters to match target sprite views.
 
     Args:
         images: list of [H, W, 4] target RGBA images
         cameras: camera collection
-        init_*: initial Gaussian parameters
-        init_sh_coeffs: [N, K, 3] initial SH coefficients
+        init_gaussians: initial Gaussians to optimize
         num_iterations: training iterations
         lr: base learning rate
-        sh_degree: SH degree for rendering
         device: cuda or cpu
         pose_opt: if True, also optimize camera poses
         fix_positions: if True, keep Gaussian positions fixed
 
     Returns:
-        Optimized (means, scales, quats, opacities, sh_coeffs)
+        Optimized Gaussians object
     """
-    if device == 'cuda' and not torch.cuda.is_available():
-        print("  CUDA not available, using CPU")
-        device = 'cpu'
-
-    device = torch.device(device)
+    device = get_device(device)
+    sh_degree = init_gaussians.sh_degree
 
     targets = torch.stack(images).to(device)
     target_rgb = targets[:, :, :, :3]
@@ -212,15 +167,15 @@ def train_gaussians(
     viewmats = cameras.viewmats.to(device)
     intrinsics = cameras.Ks.to(device)
 
-    means = init_means.clone().to(device)
+    means = init_gaussians.means.clone().to(device)
     if not fix_positions:
         means.requires_grad_(True)
-    scales = init_scales.clone().to(device).requires_grad_(True)
-    quats = init_quats.clone().to(device).requires_grad_(True)
-    opacities = init_opacities.clone().to(device).requires_grad_(True)
+    scales = init_gaussians.scales.clone().to(device).requires_grad_(True)
+    quats = init_gaussians.quats.clone().to(device).requires_grad_(True)
+    opacities = init_gaussians.opacities.clone().to(device).requires_grad_(True)
 
     # Split SH coefficients into DC (sh0) and higher order (shN)
-    sh_coeffs = init_sh_coeffs.clone().to(device)
+    sh_coeffs = init_gaussians.sh_coeffs.clone().to(device)
     sh0 = sh_coeffs[:, :1, :].clone().requires_grad_(True)  # [N, 1, 3]
     shN = sh_coeffs[:, 1:, :].clone().requires_grad_(True)  # [N, K-1, 3]
 
@@ -257,10 +212,9 @@ def train_gaussians(
 
     # Test if gsplat works
     sh_full = torch.cat([sh0, shN], dim=1)
+    test_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
     gsplat_result = try_gsplat_render(
-        means, scales, quats, opacities, sh_full,
-        viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE, device,
-        sh_degree=sh_degree,
+        test_gaussians, viewmats[:1], intrinsics[:1], IMAGE_SIZE, IMAGE_SIZE,
     )
     use_gsplat = gsplat_result is not None
 
@@ -272,8 +226,9 @@ def train_gaussians(
         if pose_optimizer is not None:
             pose_optimizer.zero_grad()
 
-        # Concatenate SH coefficients
+        # Concatenate SH coefficients and create Gaussians for rendering
         sh_full = torch.cat([sh0, shN], dim=1)
+        current_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
 
         if use_gsplat:
             # Apply pose adjustment if enabled
@@ -283,9 +238,7 @@ def train_gaussians(
                 current_viewmats = pose_adjust.forward_viewmats(viewmats, camera_ids)
 
             result = try_gsplat_render(
-                means, scales, quats, opacities, sh_full,
-                current_viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE, device,
-                sh_degree=sh_degree,
+                current_gaussians, current_viewmats, intrinsics, IMAGE_SIZE, IMAGE_SIZE,
             )
             if result is None:
                 use_gsplat = False
@@ -309,9 +262,7 @@ def train_gaussians(
                     ).squeeze(0)
 
                 rc, ra = render_gaussians_simple(
-                    means, scales, quats, opacities, sh_full,
-                    current_viewmat, intrinsics[vi], IMAGE_SIZE, IMAGE_SIZE,
-                    sh_degree=sh_degree,
+                    current_gaussians, current_viewmat, intrinsics[vi], IMAGE_SIZE, IMAGE_SIZE,
                 )
                 render_colors_list.append(rc)
                 render_alphas_list.append(ra)
@@ -348,8 +299,13 @@ def train_gaussians(
     # Reconstruct full SH coefficients
     sh_coeffs_out = torch.cat([sh0, shN], dim=1)
 
-    return (means.detach().cpu(), scales.detach().cpu(), quats.detach().cpu(),
-            opacities.detach().cpu(), sh_coeffs_out.detach().cpu())
+    return Gaussians(
+        means=means.detach().cpu(),
+        scales=scales.detach().cpu(),
+        quats=quats.detach().cpu(),
+        opacities=opacities.detach().cpu(),
+        sh_coeffs=sh_coeffs_out.detach().cpu(),
+    )
 
 
 def main() -> None:
@@ -394,15 +350,14 @@ def main() -> None:
     points = carve_visual_hull(images, cameras, resolution=args.resolution)
 
     print("Initializing Gaussians...")
-    means, scales, quats, opacities, sh_coeffs = init_gaussians(
+    gaussians = init_gaussians(
         points, images, cameras, num_gaussians=args.num_gaussians
     )
-    print(f"  Initialized {means.shape[0]} Gaussians (SH degree {SH_DEGREE})")
+    print(f"  Initialized {gaussians.num_gaussians} Gaussians (SH degree {gaussians.sh_degree})")
 
     print(f"Training for {args.iterations} iterations...")
-    means, scales, quats, opacities, sh_coeffs = train_gaussians(
-        images, cameras,
-        means, scales, quats, opacities, sh_coeffs,
+    gaussians = train_gaussians(
+        images, cameras, gaussians,
         num_iterations=args.iterations,
         lr=args.lr,
         device=args.device,
@@ -412,7 +367,7 @@ def main() -> None:
 
     output_path = project_dir / args.output
     print(f"Exporting to {output_path}...")
-    export_ply(means, scales, quats, opacities, sh_coeffs, str(output_path))
+    export_ply(gaussians, str(output_path))
 
     print("Done!")
 

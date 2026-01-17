@@ -1,16 +1,16 @@
 """PLY file I/O for Gaussian Splatting with Spherical Harmonics support."""
 
 import struct
-from typing import Tuple
 
 import numpy as np
 import torch
 
 from .constants import SH_DEGREE
-from .sh import SH_C0, rgb_to_sh, init_sh_from_rgb
+from .gaussians import Gaussians
+from .sh import SH_C0
 
 
-def load_ply(path: str, sh_degree: int = SH_DEGREE) -> Tuple[torch.Tensor, ...]:
+def load_ply(path: str, sh_degree: int = SH_DEGREE) -> Gaussians:
     """
     Load gaussian parameters from PLY file.
 
@@ -21,11 +21,7 @@ def load_ply(path: str, sh_degree: int = SH_DEGREE) -> Tuple[torch.Tensor, ...]:
         sh_degree: Target SH degree for output (0, 1, or 2)
 
     Returns:
-        means: [N, 3] positions
-        scales: [N, 3] log-scales
-        quats: [N, 4] quaternions (wxyz)
-        opacities: [N] logit opacities
-        sh_coeffs: [N, K, 3] SH coefficients where K = (sh_degree+1)^2
+        Gaussians object containing means, scales, quats, opacities, sh_coeffs
     """
     with open(path, 'rb') as f:
         # Parse header
@@ -108,43 +104,32 @@ def load_ply(path: str, sh_degree: int = SH_DEGREE) -> Tuple[torch.Tensor, ...]:
         sh_coeffs = np.zeros((num_vertices, target_coeffs, 3), dtype=np.float32)
         sh_coeffs[:, 0, :] = (rgb - 0.5) / SH_C0
 
-    return (
-        torch.from_numpy(means),
-        torch.from_numpy(scales),
-        torch.from_numpy(quats),
-        torch.from_numpy(opacities),
-        torch.from_numpy(sh_coeffs.astype(np.float32)),
+    return Gaussians(
+        means=torch.from_numpy(means),
+        scales=torch.from_numpy(scales),
+        quats=torch.from_numpy(quats),
+        opacities=torch.from_numpy(opacities),
+        sh_coeffs=torch.from_numpy(sh_coeffs.astype(np.float32)),
     )
 
 
-def export_ply(
-    means: torch.Tensor,
-    scales: torch.Tensor,
-    quats: torch.Tensor,
-    opacities: torch.Tensor,
-    sh_coeffs: torch.Tensor,
-    output_path: str,
-) -> None:
+def export_ply(gaussians: Gaussians, output_path: str) -> None:
     """
     Export Gaussians to standard PLY format with full SH coefficients.
 
     Args:
-        means: [N, 3] positions
-        scales: [N, 3] log-scales
-        quats: [N, 4] quaternions (wxyz)
-        opacities: [N] logit opacities
-        sh_coeffs: [N, K, 3] SH coefficients
+        gaussians: Gaussians object to export
         output_path: Output file path
     """
-    n = means.shape[0]
-    num_sh_coeffs = sh_coeffs.shape[1]
+    n = gaussians.num_gaussians
+    num_sh_coeffs = gaussians.sh_coeffs.shape[1]
     num_f_rest = (num_sh_coeffs - 1) * 3  # Excluding DC
 
-    means_np = means.detach().cpu().numpy()
-    scales_np = scales.detach().cpu().numpy()
-    quats_np = quats.detach().cpu().numpy()
-    opacities_np = opacities.detach().cpu().numpy()
-    sh_np = sh_coeffs.detach().cpu().numpy()
+    means_np = gaussians.means.detach().cpu().numpy()
+    scales_np = gaussians.scales.detach().cpu().numpy()
+    quats_np = gaussians.quats.detach().cpu().numpy()
+    opacities_np = gaussians.opacities.detach().cpu().numpy()
+    sh_np = gaussians.sh_coeffs.detach().cpu().numpy()
 
     # Build header
     header_lines = [

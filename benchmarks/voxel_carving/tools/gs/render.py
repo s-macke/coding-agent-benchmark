@@ -5,8 +5,8 @@ from typing import Optional, Tuple
 import torch
 import torch.nn.functional as F
 
+from .gaussians import Gaussians
 from .sh import eval_sh
-from .constants import SH_DEGREE
 
 # Rendering constants
 MIN_SIGMA = 0.5
@@ -15,16 +15,11 @@ CLAMP_EPSILON = 1e-6
 
 
 def render_gaussians_simple(
-    means: torch.Tensor,
-    scales: torch.Tensor,
-    quats: torch.Tensor,
-    opacities: torch.Tensor,
-    sh_coeffs: torch.Tensor,
+    gaussians: Gaussians,
     viewmat: torch.Tensor,
     K: torch.Tensor,
     width: int,
     height: int,
-    sh_degree: int = SH_DEGREE,
     camera_pos: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
@@ -33,22 +28,23 @@ def render_gaussians_simple(
     Projects Gaussians and accumulates with alpha blending (back to front).
 
     Args:
-        means: [N, 3] Gaussian positions
-        scales: [N, 3] log-scales
-        quats: [N, 4] quaternions
-        opacities: [N] logit opacities
-        sh_coeffs: [N, K, 3] SH coefficients where K = (sh_degree+1)^2
+        gaussians: Gaussians object with means, scales, quats, opacities, sh_coeffs
         viewmat: [4, 4] view matrix
         K: [3, 3] intrinsic matrix
         width: image width
         height: image height
-        sh_degree: SH degree to use for evaluation
         camera_pos: [3] camera position in world coords (computed from viewmat if None)
 
     Returns:
         render_rgb: [H, W, 3]
         render_alpha: [H, W, 1]
     """
+    means = gaussians.means
+    scales = gaussians.scales
+    opacities = gaussians.opacities
+    sh_coeffs = gaussians.sh_coeffs
+    sh_degree = gaussians.sh_degree
+
     n = means.shape[0]
     device = means.device
 
@@ -118,33 +114,21 @@ def render_gaussians_simple(
 
 
 def try_gsplat_render(
-    means: torch.Tensor,
-    scales: torch.Tensor,
-    quats: torch.Tensor,
-    opacities: torch.Tensor,
-    sh_coeffs: torch.Tensor,
+    gaussians: Gaussians,
     viewmats: torch.Tensor,
     Ks: torch.Tensor,
     width: int,
     height: int,
-    device: torch.device,
-    sh_degree: int = SH_DEGREE,
 ):
     """
     Try to use gsplat for rendering if available.
 
     Args:
-        means: [N, 3] Gaussian positions
-        scales: [N, 3] log-scales
-        quats: [N, 4] quaternions
-        opacities: [N] logit opacities
-        sh_coeffs: [N, K, 3] SH coefficients
+        gaussians: Gaussians object with means, scales, quats, opacities, sh_coeffs
         viewmats: [C, 4, 4] view matrices
         Ks: [C, 3, 3] intrinsic matrices
         width: image width
         height: image height
-        device: torch device
-        sh_degree: SH degree for evaluation
 
     Returns:
         (render_colors, render_alphas) if successful, None otherwise
@@ -156,23 +140,23 @@ def try_gsplat_render(
     try:
         import gsplat
 
-        actual_scales = torch.exp(scales)
-        actual_opacities = torch.sigmoid(opacities)
+        actual_scales = torch.exp(gaussians.scales)
+        actual_opacities = torch.sigmoid(gaussians.opacities)
 
         # gsplat expects colors as SH coefficients [N, K, 3]
         render_colors, render_alphas, meta = gsplat.rasterization(
-            means=means,
-            quats=quats,
+            means=gaussians.means,
+            quats=gaussians.quats,
             scales=actual_scales,
             opacities=actual_opacities,
-            colors=sh_coeffs,
+            colors=gaussians.sh_coeffs,
             viewmats=viewmats,
             Ks=Ks,
             width=width,
             height=height,
             camera_model="ortho",
             packed=False,
-            sh_degree=sh_degree,
+            sh_degree=gaussians.sh_degree,
         )
         return render_colors, render_alphas
     except Exception as e:
