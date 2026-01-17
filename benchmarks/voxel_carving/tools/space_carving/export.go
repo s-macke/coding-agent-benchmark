@@ -6,10 +6,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+
+	"voxelcarve/common"
 )
 
 // ExportPLY exports occupied voxel centers as an ASCII PLY point cloud.
-func ExportPLY(points []Vec3, path string) error {
+func ExportPLY(points []common.Vec3, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err

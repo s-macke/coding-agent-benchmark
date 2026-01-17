@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"math"
+
+	"voxelcarve/common"
 )
 
 // Camera defines the interface for camera projection operations.
 type Camera interface {
-	Project(point Vec3) (x, y float64)
-	ProjectWithDepth(point Vec3) (x, y, z float64)
+	Project(point common.Vec3) (x, y float64)
+	ProjectWithDepth(point common.Vec3) (x, y, z float64)
 	Mirror() Camera
 	IsPerspective() bool
 	Base() *CameraBase
@@ -16,25 +18,25 @@ type Camera interface {
 
 // CameraBase contains shared data for all camera types.
 type CameraBase struct {
-	ViewMat  Mat4
+	ViewMat  common.Mat4
 	Width    int
 	Height   int
-	Fx, Fy   float64 // Focal lengths (pixels)
-	Cx, Cy   float64 // Principal point (image center)
-	Position Vec3    // Camera position (for mirroring)
-	Up       Vec3    // Camera up vector (for mirroring)
-	Right    Vec3    // Camera right vector (for mirroring)
+	Fx, Fy   float64     // Focal lengths (pixels)
+	Cx, Cy   float64     // Principal point (image center)
+	Position common.Vec3 // Camera position (for mirroring)
+	Up       common.Vec3 // Camera up vector (for mirroring)
+	Right    common.Vec3 // Camera right vector (for mirroring)
 }
 
 // computePosition calculates camera position from yaw and pitch angles.
 // YAW 0 = rear (camera at -X), 180 = front (camera at +X)
 // PITCH 90 = below (camera at -Z), -90 = above (camera at +Z)
-func computePosition(yawDeg, pitchDeg, distance float64) Vec3 {
+func computePosition(yawDeg, pitchDeg, distance float64) common.Vec3 {
 	yaw := yawDeg * math.Pi / 180.0
 	pitch := pitchDeg * math.Pi / 180.0
 	cosPitch := math.Cos(pitch)
 
-	return Vec3{
+	return common.Vec3{
 		X: -distance * math.Cos(yaw) * cosPitch,
 		Y: distance * math.Sin(yaw) * cosPitch,
 		Z: distance * math.Sin(pitch),
@@ -43,7 +45,7 @@ func computePosition(yawDeg, pitchDeg, distance float64) Vec3 {
 
 // validateOrthogonalBasis checks that right, up, and forward vectors form an orthonormal basis.
 // Panics if vectors are not mutually perpendicular or not unit length.
-func validateOrthogonalBasis(right, up, forward Vec3) {
+func validateOrthogonalBasis(right, up, forward common.Vec3) {
 	const epsilon = 1e-6
 
 	// Check unit length
@@ -71,13 +73,13 @@ func validateOrthogonalBasis(right, up, forward Vec3) {
 
 // buildViewMatrix constructs the 4x4 world-to-camera view matrix.
 // The camera looks at origin (0, 0, 0).
-func buildViewMatrix(position, up, right Vec3) Mat4 {
+func buildViewMatrix(position, up, right common.Vec3) common.Mat4 {
 	// Forward vector points from camera toward origin
 	forward := position.Negate().Normalize()
 	validateOrthogonalBasis(right, up, forward)
 
 	// Build view matrix: rows are right, up, forward in camera space
-	var mat Mat4
+	var mat common.Mat4
 
 	// Row 0: right
 	mat[0] = right.X

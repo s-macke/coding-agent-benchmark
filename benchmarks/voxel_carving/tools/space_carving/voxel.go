@@ -1,14 +1,16 @@
 package main
 
+import "voxelcarve/common"
+
 // Voxel represents a single voxel with opacity and color.
 type Voxel struct {
 	Opacity float64
 	R, G, B float64
 }
 
-// Color returns the voxel's color as a Color struct.
-func (v *Voxel) Color() Color {
-	return Color{R: v.R, G: v.G, B: v.B, A: 1.0}
+// Color returns the voxel's color as a common.Color struct.
+func (v *Voxel) Color() common.Color {
+	return common.Color{R: v.R, G: v.G, B: v.B, A: 1.0}
 }
 
 // VoxelGrid represents a 3D grid of voxels.
@@ -41,12 +43,12 @@ func (g *VoxelGrid) Index(ix, iy, iz int) int {
 }
 
 // Position returns the world position of a voxel center.
-func (g *VoxelGrid) Position(ix, iy, iz int) Vec3 {
+func (g *VoxelGrid) Position(ix, iy, iz int) common.Vec3 {
 	// Map index to [-extent, extent]
 	x := -g.Extent + (float64(ix)+0.5)*g.voxelSize
 	y := -g.Extent + (float64(iy)+0.5)*g.voxelSize
 	z := -g.Extent + (float64(iz)+0.5)*g.voxelSize
-	return Vec3{x, y, z}
+	return common.Vec3{x, y, z}
 }
 
 // Get returns the opacity of a voxel (0-1).
@@ -134,7 +136,7 @@ func (g *VoxelGrid) SurfaceCount() int {
 }
 
 // WorldToGrid converts world coordinates to grid indices (not clamped).
-func (g *VoxelGrid) WorldToGrid(pos Vec3) (float64, float64, float64) {
+func (g *VoxelGrid) WorldToGrid(pos common.Vec3) (float64, float64, float64) {
 	fx := (pos.X + g.Extent) / g.voxelSize
 	fy := (pos.Y + g.Extent) / g.voxelSize
 	fz := (pos.Z + g.Extent) / g.voxelSize
@@ -143,8 +145,8 @@ func (g *VoxelGrid) WorldToGrid(pos Vec3) (float64, float64, float64) {
 
 // RayBoxIntersect returns t values where ray enters/exits the grid bounds.
 // Uses slab method for AABB intersection.
-func (g *VoxelGrid) RayBoxIntersect(origin, dir Vec3) (tMin, tMax float64) {
-	invDir := Vec3{1.0 / dir.X, 1.0 / dir.Y, 1.0 / dir.Z}
+func (g *VoxelGrid) RayBoxIntersect(origin, dir common.Vec3) (tMin, tMax float64) {
+	invDir := common.Vec3{1.0 / dir.X, 1.0 / dir.Y, 1.0 / dir.Z}
 
 	t1 := (-g.Extent - origin.X) * invDir.X
 	t2 := (g.Extent - origin.X) * invDir.X
@@ -161,7 +163,7 @@ func (g *VoxelGrid) RayBoxIntersect(origin, dir Vec3) (tMin, tMax float64) {
 
 // IsVisibleFrom checks if voxel (ix,iy,iz) is visible from camPos using DDA.
 // Returns true if the ray from camPos hits this voxel first (no occlusion).
-func (g *VoxelGrid) IsVisibleFrom(ix, iy, iz int, camPos Vec3) bool {
+func (g *VoxelGrid) IsVisibleFrom(ix, iy, iz int, camPos common.Vec3) bool {
 	target := g.Position(ix, iy, iz)
 
 	// Ray direction from camera toward voxel
@@ -273,8 +275,8 @@ func abs(x float64) float64 {
 }
 
 // OccupiedPositions returns world positions of all voxels with opacity > 0.5.
-func (g *VoxelGrid) OccupiedPositions() []Vec3 {
-	positions := make([]Vec3, 0, g.OccupiedCount())
+func (g *VoxelGrid) OccupiedPositions() []common.Vec3 {
+	positions := make([]common.Vec3, 0, g.OccupiedCount())
 	for ix := 0; ix < g.Resolution; ix++ {
 		for iy := 0; iy < g.Resolution; iy++ {
 			for iz := 0; iz < g.Resolution; iz++ {

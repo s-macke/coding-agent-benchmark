@@ -39,7 +39,7 @@ func filterCardinalSprites(sprites []Sprite) []Sprite {
 func main() {
 	jsonPath := flag.String("json", "ship_sprites_centered.json", "JSON file path")
 	imagesDir := flag.String("images", "centered_images", "Images directory")
-	outputPath := flag.String("output", "model.ply", "Output PLY path")
+	outputPath := flag.String("output", "model.ply", "Output path (default: model.vox if -vox, else model.ply)")
 	resolution := flag.Int("resolution", 128, "Voxel grid size")
 	extent := flag.Float64("extent", 1.5, "Grid extent (±value)")
 	orthoScale := flag.Float64("ortho", 2.0, "Orthographic scale")
@@ -55,6 +55,11 @@ func main() {
 	cameraType := flag.String("camera", "", "Camera type: 'orthographic' or 'perspective' (required)")
 	fov := flag.Float64("fov", 60.0, "Vertical field of view in degrees (for perspective mode)")
 	flag.Parse()
+
+	// Adjust default output filename based on format
+	if *vox && *outputPath == "model.ply" {
+		*outputPath = "model.vox"
+	}
 
 	// Check for unknown arguments
 	if flag.NArg() > 0 {

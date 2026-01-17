@@ -1,4 +1,4 @@
-package main
+package common
 
 // Color represents an RGBA color with float64 components in 0-1 range.
 type Color struct {
