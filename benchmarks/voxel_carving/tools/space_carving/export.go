@@ -183,15 +183,13 @@ func ExportVOX(grid *VoxelGrid, path string) error {
 
 	w := bufio.NewWriter(file)
 
-	// Collect surface voxels and build color palette
-	type voxelData struct {
-		x, y, z    uint8
-		colorIndex uint8
+	// First pass: collect all colors and their frequencies
+	colorFreq := make(map[uint32]int)
+	type voxelPos struct {
+		x, y, z uint8
+		r, g, b uint8
 	}
-	var voxels []voxelData
-	colorToIndex := make(map[uint32]uint8) // RGB packed -> palette index
-	var palette [][4]uint8                 // RGBA values
-	nextIndex := uint8(1)                  // Index 0 is reserved (empty)
+	var voxelPositions []voxelPos
 
 	for ix := 0; ix < grid.Resolution; ix++ {
 		for iy := 0; iy < grid.Resolution; iy++ {
@@ -202,28 +200,36 @@ func ExportVOX(grid *VoxelGrid, path string) error {
 				}
 
 				r, g, b, _ := v.Color().RGBA()
-				colorKey := uint32(r)<<16 | uint32(g)<<8 | uint32(b)
+				colorKey := PackRGB(uint8(r), uint8(g), uint8(b))
+				colorFreq[colorKey]++
 
-				idx, exists := colorToIndex[colorKey]
-				if !exists {
-					if nextIndex == 0 { // Wrapped around, too many colors
-						return fmt.Errorf("too many unique colors (>255)")
-					}
-					idx = nextIndex
-					colorToIndex[colorKey] = idx
-					palette = append(palette, [4]uint8{uint8(r), uint8(g), uint8(b), 255})
-					nextIndex++
-				}
-
-				voxels = append(voxels, voxelData{
-					x:          uint8(ix),
-					y:          uint8(iy),
-					z:          uint8(iz),
-					colorIndex: idx,
+				voxelPositions = append(voxelPositions, voxelPos{
+					x: uint8(ix), y: uint8(iy), z: uint8(iz),
+					r: uint8(r), g: uint8(g), b: uint8(b),
 				})
 			}
 		}
 	}
+
+	// Build palette (with quantization if needed)
+	pal := BuildPalette(colorFreq)
+
+	// Second pass: assign voxels to palette indices
+	type voxelData struct {
+		x, y, z    uint8
+		colorIndex uint8
+	}
+	voxels := make([]voxelData, len(voxelPositions))
+	for i, vp := range voxelPositions {
+		voxels[i] = voxelData{
+			x:          vp.x,
+			y:          vp.y,
+			z:          vp.z,
+			colorIndex: pal.GetIndex(vp.r, vp.g, vp.b),
+		}
+	}
+
+	palette := pal.ToRGBA()
 
 	// Build SIZE chunk content
 	sizeContent := new(bytes.Buffer)

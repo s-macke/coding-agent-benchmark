@@ -52,7 +52,7 @@ func main() {
 	render := flag.Bool("render", false, "Render comparison images for each view")
 	renderDir := flag.String("renderdir", "renders", "Output directory for rendered images")
 	cardinal := flag.Bool("cardinal", false, "Use only cardinal camera directions (6 orthogonal views)")
-	perspective := flag.Bool("perspective", false, "Use perspective projection (default: orthographic)")
+	cameraType := flag.String("camera", "", "Camera type: 'orthographic' or 'perspective' (required)")
 	fov := flag.Float64("fov", 60.0, "Vertical field of view in degrees (for perspective mode)")
 	flag.Parse()
 
@@ -61,6 +61,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: unknown argument(s): %v\n", flag.Args())
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	// Validate required camera type
+	if *cameraType != "orthographic" && *cameraType != "perspective" {
+		fatalf("Error: -camera flag is required and must be 'orthographic' or 'perspective'")
 	}
 
 	fmt.Printf("Loading sprites from %s...\n", *jsonPath)
@@ -76,7 +81,7 @@ func main() {
 	}
 
 	projType := "orthographic"
-	if *perspective {
+	if *cameraType == "perspective" {
 		projType = fmt.Sprintf("perspective (FOV=%.1f°)", *fov)
 	}
 	fmt.Printf("Loading images and building cameras (%s)...\n", projType)
@@ -92,7 +97,7 @@ func main() {
 		}
 		images[i] = img
 
-		if *perspective {
+		if *cameraType == "perspective" {
 			cameras[i] = NewPerspectiveCamera(
 				sprite.Yaw,
 				sprite.Pitch,
