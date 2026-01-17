@@ -1,41 +1,29 @@
 package main
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
-// Camera represents an orthographic camera with view matrix and projection parameters.
-type Camera struct {
+// Camera defines the interface for camera projection operations.
+type Camera interface {
+	Project(point Vec3) (x, y float64)
+	ProjectWithDepth(point Vec3) (x, y, z float64)
+	Mirror() Camera
+	IsPerspective() bool
+	Base() *CameraBase
+}
+
+// CameraBase contains shared data for all camera types.
+type CameraBase struct {
 	ViewMat  Mat4
 	Width    int
 	Height   int
-	Fx, Fy   float64 // Orthographic focal lengths
+	Fx, Fy   float64 // Focal lengths (pixels)
 	Cx, Cy   float64 // Principal point (image center)
 	Position Vec3    // Camera position (for mirroring)
 	Up       Vec3    // Camera up vector (for mirroring)
 	Right    Vec3    // Camera right vector (for mirroring)
-}
-
-// NewCamera creates a camera from sprite parameters.
-func NewCamera(yaw, pitch float64, up, right Vec3, width, height int, orthoScale, distance float64) *Camera {
-	position := computePosition(yaw, pitch, distance)
-	viewMat := buildViewMatrix(position, up, right)
-
-	fx := float64(width) / (2 * orthoScale)
-	fy := float64(height) / (2 * orthoScale)
-	cx := float64(width) / 2.0
-	cy := float64(height) / 2.0
-
-	return &Camera{
-		ViewMat:  viewMat,
-		Width:    width,
-		Height:   height,
-		Fx:       fx,
-		Fy:       fy,
-		Cx:       cx,
-		Cy:       cy,
-		Position: position,
-		Up:       up,
-		Right:    right,
-	}
 }
 
 // computePosition calculates camera position from yaw and pitch angles.
@@ -53,11 +41,40 @@ func computePosition(yawDeg, pitchDeg, distance float64) Vec3 {
 	}
 }
 
+// validateOrthogonalBasis checks that right, up, and forward vectors form an orthonormal basis.
+// Panics if vectors are not mutually perpendicular or not unit length.
+func validateOrthogonalBasis(right, up, forward Vec3) {
+	const epsilon = 1e-6
+
+	// Check unit length
+	if d := math.Abs(right.Length() - 1.0); d > epsilon {
+		panic(fmt.Sprintf("camera basis not normalized: |right| = %v", right.Length()))
+	}
+	if d := math.Abs(up.Length() - 1.0); d > epsilon {
+		panic(fmt.Sprintf("camera basis not normalized: |up| = %v", up.Length()))
+	}
+	if d := math.Abs(forward.Length() - 1.0); d > epsilon {
+		panic(fmt.Sprintf("camera basis not normalized: |forward| = %v", forward.Length()))
+	}
+
+	// Check orthogonality
+	if d := math.Abs(right.Dot(up)); d > epsilon {
+		panic(fmt.Sprintf("camera basis not orthogonal: right·up = %v", d))
+	}
+	if d := math.Abs(right.Dot(forward)); d > epsilon {
+		panic(fmt.Sprintf("camera basis not orthogonal: right·forward = %v", d))
+	}
+	if d := math.Abs(up.Dot(forward)); d > epsilon {
+		panic(fmt.Sprintf("camera basis not orthogonal: up·forward = %v", d))
+	}
+}
+
 // buildViewMatrix constructs the 4x4 world-to-camera view matrix.
 // The camera looks at origin (0, 0, 0).
 func buildViewMatrix(position, up, right Vec3) Mat4 {
 	// Forward vector points from camera toward origin
 	forward := position.Negate().Normalize()
+	validateOrthogonalBasis(right, up, forward)
 
 	// Build view matrix: rows are right, up, forward in camera space
 	var mat Mat4
@@ -87,38 +104,4 @@ func buildViewMatrix(position, up, right Vec3) Mat4 {
 	mat[15] = 1
 
 	return mat
-}
-
-// Project transforms a 3D world point to 2D image coordinates using orthographic projection.
-func (c *Camera) Project(point Vec3) (x, y float64) {
-	// Transform to camera space
-	camCoords := c.ViewMat.MulVec3(point)
-
-	// Orthographic projection
-	x = c.Fx*camCoords.X + c.Cx
-	y = c.Fy*camCoords.Y + c.Cy
-
-	return x, y
-}
-
-// Mirror creates a new camera mirrored across the Y=0 plane.
-func (c *Camera) Mirror() *Camera {
-	// Mirror position and up by negating Y component
-	mirroredPos := Vec3{c.Position.X, -c.Position.Y, c.Position.Z}
-	mirroredUp := Vec3{c.Up.X, -c.Up.Y, c.Up.Z}
-	// Right vector: negate X and Z to maintain right-handed coordinate system
-	mirroredRight := Vec3{-c.Right.X, c.Right.Y, -c.Right.Z}
-
-	return &Camera{
-		ViewMat:  buildViewMatrix(mirroredPos, mirroredUp, mirroredRight),
-		Width:    c.Width,
-		Height:   c.Height,
-		Fx:       c.Fx,
-		Fy:       c.Fy,
-		Cx:       c.Cx,
-		Cy:       c.Cy,
-		Position: mirroredPos,
-		Up:       mirroredUp,
-		Right:    mirroredRight,
-	}
 }

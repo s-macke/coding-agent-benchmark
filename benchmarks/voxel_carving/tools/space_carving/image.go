@@ -59,15 +59,19 @@ func (s *SpriteImage) rgbaAt(x, y int) (r, g, b, a float64) {
 }
 
 // Sample returns bilinear interpolated RGBA (0-1) at float coordinates.
+// Pixel centers are at half-integer coordinates (0.5, 1.5, ...).
 // Returns zero color for out-of-bounds coordinates.
 func (s *SpriteImage) Sample(x, y float64) Color {
 	if x < 0 || x >= float64(s.Width()) || y < 0 || y >= float64(s.Height()) {
 		return Color{}
 	}
 
-	x0, y0 := int(math.Floor(x)), int(math.Floor(y))
+	// Offset by 0.5 so pixel centers are at half-integers
+	// e.g., (0.5, 0.5) samples pixel (0,0) exactly
+	sx, sy := x-0.5, y-0.5
+	x0, y0 := int(math.Floor(sx)), int(math.Floor(sy))
 	x1, y1 := x0+1, y0+1
-	fx, fy := x-float64(x0), y-float64(y0)
+	fx, fy := sx-float64(x0), sy-float64(y0)
 
 	r00, g00, b00, a00 := s.rgbaAt(x0, y0)
 	r10, g10, b10, a10 := s.rgbaAt(x1, y0)

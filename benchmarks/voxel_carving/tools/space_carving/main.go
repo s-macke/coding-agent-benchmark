@@ -52,6 +52,8 @@ func main() {
 	render := flag.Bool("render", false, "Render comparison images for each view")
 	renderDir := flag.String("renderdir", "renders", "Output directory for rendered images")
 	cardinal := flag.Bool("cardinal", false, "Use only cardinal camera directions (6 orthogonal views)")
+	perspective := flag.Bool("perspective", false, "Use perspective projection (default: orthographic)")
+	fov := flag.Float64("fov", 60.0, "Vertical field of view in degrees (for perspective mode)")
 	flag.Parse()
 
 	// Check for unknown arguments
@@ -73,8 +75,12 @@ func main() {
 		fmt.Printf("  Filtered to %d cardinal views\n", len(sprites))
 	}
 
-	fmt.Println("Loading images and building cameras...")
-	cameras := make([]*Camera, len(sprites))
+	projType := "orthographic"
+	if *perspective {
+		projType = fmt.Sprintf("perspective (FOV=%.1f°)", *fov)
+	}
+	fmt.Printf("Loading images and building cameras (%s)...\n", projType)
+	cameras := make([]Camera, len(sprites))
 	images := make([]*SpriteImage, len(sprites))
 
 	for i, sprite := range sprites {
@@ -86,16 +92,29 @@ func main() {
 		}
 		images[i] = img
 
-		cameras[i] = NewCamera(
-			sprite.Yaw,
-			sprite.Pitch,
-			sprite.CameraUpVec(),
-			sprite.CameraRightVec(),
-			sprite.Width,
-			sprite.Height,
-			*orthoScale,
-			*distance,
-		)
+		if *perspective {
+			cameras[i] = NewPerspectiveCamera(
+				sprite.Yaw,
+				sprite.Pitch,
+				sprite.CameraUpVec(),
+				sprite.CameraRightVec(),
+				sprite.Width,
+				sprite.Height,
+				*fov,
+				*distance,
+			)
+		} else {
+			cameras[i] = NewOrthographicCamera(
+				sprite.Yaw,
+				sprite.Pitch,
+				sprite.CameraUpVec(),
+				sprite.CameraRightVec(),
+				sprite.Width,
+				sprite.Height,
+				*orthoScale,
+				*distance,
+			)
+		}
 	}
 	fmt.Printf("  Loaded %d images\n", len(images))
 
