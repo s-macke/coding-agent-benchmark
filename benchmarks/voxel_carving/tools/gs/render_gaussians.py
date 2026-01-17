@@ -9,10 +9,12 @@ Options:
     --input PATH        Input PLY file (default: ship_gaussians.ply)
     --output PATH       Output comparison image (default: gaussians_comparison.png)
     --device DEVICE     cuda or cpu (default: cuda if available)
+    --camera-type TYPE  orthographic or perspective (default: orthographic)
+    --ortho-scale FLOAT Orthographic scale (default: 2.0)
+    --fov FLOAT         Perspective field of view in degrees (default: 60.0)
 """
 
 import argparse
-import struct
 from pathlib import Path
 from typing import List, Tuple
 
@@ -20,68 +22,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .constants import IMAGE_SIZE, SH_C0
+from .constants import IMAGE_SIZE, SPRITES_JSON, SPRITES_DIR
+from .ply import load_ply
 from .sprites import load_sprites
-from .camera import CameraCollection
+from .camera import CameraCollection, PerspectiveCamera
 from .render import try_gsplat_render
-
-
-def load_ply(path: str) -> Tuple[torch.Tensor, ...]:
-    """
-    Load gaussian parameters from PLY file.
-
-    Returns:
-        means: [N, 3] positions
-        scales: [N, 3] log-scales
-        quats: [N, 4] quaternions (wxyz)
-        opacities: [N] logit opacities
-        colors: [N, 3] RGB colors
-    """
-    with open(path, 'rb') as f:
-        # Parse header
-        line = f.readline().decode().strip()
-        if line != 'ply':
-            raise ValueError(f"Not a PLY file: {path}")
-
-        num_vertices = 0
-        while True:
-            line = f.readline().decode().strip()
-            if line.startswith('element vertex'):
-                num_vertices = int(line.split()[-1])
-            elif line == 'end_header':
-                break
-
-        if num_vertices == 0:
-            raise ValueError("No vertices found in PLY file")
-
-        # Read binary data: 14 floats per gaussian
-        # xyz, f_dc_0-2, opacity, scale_0-2, rot_0-3
-        means = np.zeros((num_vertices, 3), dtype=np.float32)
-        sh_dc = np.zeros((num_vertices, 3), dtype=np.float32)
-        opacities = np.zeros(num_vertices, dtype=np.float32)
-        scales = np.zeros((num_vertices, 3), dtype=np.float32)
-        quats = np.zeros((num_vertices, 4), dtype=np.float32)
-
-        for i in range(num_vertices):
-            data = struct.unpack('<14f', f.read(14 * 4))
-            means[i] = data[0:3]
-            sh_dc[i] = data[3:6]
-            opacities[i] = data[6]
-            scales[i] = data[7:10]
-            # Convert quaternion from xyzw (file) to wxyz (internal)
-            quats[i] = [data[13], data[10], data[11], data[12]]  # w, x, y, z
-
-    # Convert SH DC back to RGB: color = sh * C0 + 0.5
-    colors = sh_dc * SH_C0 + 0.5
-    colors = np.clip(colors, 0, 1)
-
-    return (
-        torch.from_numpy(means),
-        torch.from_numpy(scales),
-        torch.from_numpy(quats),
-        torch.from_numpy(opacities),
-        torch.from_numpy(colors),
-    )
 
 
 def render_points_fast(
@@ -92,11 +37,16 @@ def render_points_fast(
     K: torch.Tensor,
     width: int,
     height: int,
+    perspective: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Fast point-based renderer using scatter_add (fully vectorized).
 
     Renders gaussians as colored points with depth sorting.
+
+    Args:
+        perspective: If True, use perspective projection (divide by depth).
+                    If False, use orthographic projection.
     """
     device = means.device
     N = means.shape[0]
@@ -105,13 +55,19 @@ def render_points_fast(
     means_homo = torch.cat([means, torch.ones(N, 1, device=device)], dim=1)
     cam_means = (viewmat @ means_homo.T).T[:, :3]
 
-    # Orthographic projection
     fx, fy = K[0, 0], K[1, 1]
     cx, cy = K[0, 2], K[1, 2]
-
-    proj_x = (fx * cam_means[:, 0] + cx).long()
-    proj_y = (fy * cam_means[:, 1] + cy).long()
     depths = -cam_means[:, 2]
+
+    if perspective:
+        # Perspective projection (divide by depth)
+        z = depths.clamp(min=1e-6)
+        proj_x = (fx * cam_means[:, 0] / z + cx).long()
+        proj_y = (fy * cam_means[:, 1] / z + cy).long()
+    else:
+        # Orthographic projection
+        proj_x = (fx * cam_means[:, 0] + cx).long()
+        proj_y = (fy * cam_means[:, 1] + cy).long()
 
     # Filter to valid pixels
     valid = (proj_x >= 0) & (proj_x < width) & (proj_y >= 0) & (proj_y < height)
@@ -171,6 +127,9 @@ def render_all_views(
     viewmats = cameras.viewmats.to(device)
     Ks = cameras.Ks.to(device)
 
+    # Detect if using perspective cameras
+    use_perspective = len(cameras) > 0 and isinstance(cameras[0], PerspectiveCamera)
+
     # Check if gsplat works
     gsplat_result = try_gsplat_render(
         means, scales, quats, opacities, colors,
@@ -181,7 +140,8 @@ def render_all_views(
     if use_gsplat:
         print("  Using gsplat renderer")
     else:
-        print("  Using fast point renderer (gsplat not available)")
+        proj_type = "perspective" if use_perspective else "orthographic"
+        print(f"  Using fast point renderer ({proj_type}, gsplat not available)")
 
     renders = []
     num_views = len(cameras)
@@ -208,7 +168,8 @@ def render_all_views(
             K = camera.K.to(device)
             rgb, alpha = render_points_fast(
                 means, opacities, colors,
-                viewmat, K, IMAGE_SIZE, IMAGE_SIZE
+                viewmat, K, IMAGE_SIZE, IMAGE_SIZE,
+                perspective=use_perspective,
             )
             rgba = torch.cat([rgb, alpha], dim=-1)
             renders.append(rgba.cpu())
@@ -266,7 +227,12 @@ def main() -> None:
     parser.add_argument('--input', default='ship_gaussians.ply', help='Input PLY file')
     parser.add_argument('--output', default='gaussians_comparison.png', help='Output image')
     parser.add_argument('--device', default='cuda', help='Device (cuda or cpu)')
-    parser.add_argument('--ortho-scale', type=float, default=2.0, help='Orthographic scale')
+    parser.add_argument('--camera-type', choices=['orthographic', 'perspective'],
+                        default='orthographic', help='Camera projection type')
+    parser.add_argument('--ortho-scale', type=float, default=2.0,
+                        help='Orthographic scale (only for orthographic camera)')
+    parser.add_argument('--fov', type=float, default=60.0,
+                        help='Field of view in degrees (only for perspective camera)')
     args = parser.parse_args()
 
     project_dir = Path(__file__).parent.parent.parent
@@ -280,14 +246,19 @@ def main() -> None:
     # Load original sprites and camera data
     print("Loading sprites and camera data...")
     images, metadata = load_sprites(
-        project_dir / 'ship_sprites_centered.json',
-        project_dir / 'centered_images'
+        project_dir / SPRITES_JSON,
+        project_dir / SPRITES_DIR
     )
     print(f"  Loaded {len(images)} sprites")
 
     # Build cameras
-    print("Building cameras...")
-    cameras = CameraCollection.from_metadata(metadata, ortho_scale=args.ortho_scale)
+    print(f"Building {args.camera_type} cameras...")
+    cameras = CameraCollection.from_metadata(
+        metadata,
+        camera_type=args.camera_type,
+        ortho_scale=args.ortho_scale,
+        fov_deg=args.fov,
+    )
     print(f"  Built {len(cameras)} cameras")
 
     # Render all views

@@ -12,17 +12,20 @@ Options:
     --lr FLOAT          Learning rate (default: 0.01)
     --resolution N      Voxel grid resolution for visual hull (default: 64)
     --device DEVICE     cuda or cpu (default: cuda if available)
+    --camera-type TYPE  orthographic or perspective (default: orthographic)
+    --ortho-scale FLOAT Orthographic scale (default: 2.0)
+    --fov FLOAT         Perspective field of view in degrees (default: 60.0)
 """
 
 import argparse
-import struct
 from pathlib import Path
 from typing import List, Tuple
 
 import torch
 import torch.nn.functional as F
 
-from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SH_C0
+from .constants import IMAGE_SIZE, ALPHA_THRESHOLD, SPRITES_JSON, SPRITES_DIR
+from .ply import export_ply
 from .sprites import load_sprites
 from .camera import CameraCollection
 from .render import render_gaussians_simple, try_gsplat_render
@@ -249,59 +252,6 @@ def train_gaussians(images: List[torch.Tensor],
             opacities.detach().cpu(), colors.detach().cpu())
 
 
-def export_ply(means: torch.Tensor,
-               scales: torch.Tensor,
-               quats: torch.Tensor,
-               opacities: torch.Tensor,
-               colors: torch.Tensor,
-               output_path: str) -> None:
-    """Export Gaussians to standard PLY format compatible with 3DGS viewers."""
-    N = means.shape[0]
-
-    means_np = means.numpy()
-    scales_np = scales.numpy()
-    quats_np = quats.numpy()
-    opacities_np = opacities.numpy()
-
-    # Convert colors to SH DC coefficients: SH0 = (color - 0.5) / C0
-    sh0_np = (colors.numpy() - 0.5) / SH_C0
-
-    with open(output_path, 'wb') as f:
-        # Header
-        header = f"""ply
-format binary_little_endian 1.0
-element vertex {N}
-property float x
-property float y
-property float z
-property float f_dc_0
-property float f_dc_1
-property float f_dc_2
-property float opacity
-property float scale_0
-property float scale_1
-property float scale_2
-property float rot_0
-property float rot_1
-property float rot_2
-property float rot_3
-end_header
-"""
-        f.write(header.encode())
-
-        # Binary data
-        for i in range(N):
-            f.write(struct.pack('<fff', *means_np[i]))
-            f.write(struct.pack('<fff', *sh0_np[i]))
-            f.write(struct.pack('<f', opacities_np[i]))
-            f.write(struct.pack('<fff', *scales_np[i]))
-            # Convert quaternion from wxyz to xyzw format
-            q = quats_np[i]
-            f.write(struct.pack('<ffff', q[1], q[2], q[3], q[0]))
-
-    print(f"Saved {N} Gaussians to {output_path}")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description='Convert sprites to 3D Gaussian Splatting')
     parser.add_argument('--output', default='ship_gaussians.ply', help='Output PLY file')
@@ -310,20 +260,30 @@ def main() -> None:
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
     parser.add_argument('--resolution', type=int, default=64, help='Voxel grid resolution')
     parser.add_argument('--device', default='cuda', help='Device (cuda or cpu)')
-    parser.add_argument('--ortho-scale', type=float, default=2.0, help='Orthographic scale')
+    parser.add_argument('--camera-type', choices=['orthographic', 'perspective'],
+                        default='orthographic', help='Camera projection type')
+    parser.add_argument('--ortho-scale', type=float, default=2.0,
+                        help='Orthographic scale (only for orthographic camera)')
+    parser.add_argument('--fov', type=float, default=60.0,
+                        help='Field of view in degrees (only for perspective camera)')
     args = parser.parse_args()
 
     project_dir = Path(__file__).parent.parent.parent
 
     print("Loading sprites and camera data...")
     images, metadata = load_sprites(
-        project_dir / 'ship_sprites_centered.json',
-        project_dir / 'centered_images'
+        project_dir / SPRITES_JSON,
+        project_dir / SPRITES_DIR
     )
     print(f"  Loaded {len(images)} sprites")
 
-    print("Building cameras...")
-    cameras = CameraCollection.from_metadata(metadata, ortho_scale=args.ortho_scale)
+    print(f"Building {args.camera_type} cameras...")
+    cameras = CameraCollection.from_metadata(
+        metadata,
+        camera_type=args.camera_type,
+        ortho_scale=args.ortho_scale,
+        fov_deg=args.fov,
+    )
     print(f"  Built {len(cameras)} cameras")
 
     print("Carving visual hull...")

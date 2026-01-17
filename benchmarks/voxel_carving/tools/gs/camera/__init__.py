@@ -26,7 +26,7 @@ import torch
 from .base import Camera, compute_camera_position
 from .orthographic import OrthographicCamera
 from .perspective import PerspectiveCamera
-from .collection import CameraCollection
+from .collection import CameraCollection, CameraType
 from ..constants import IMAGE_SIZE
 
 
@@ -36,12 +36,15 @@ __all__ = [
     "OrthographicCamera",
     "PerspectiveCamera",
     "CameraCollection",
+    "CameraType",
     # Backwards-compatible functions
     "build_cameras",
     "build_view_matrix",
     "build_orthographic_K",
+    "build_perspective_K",
     "compute_camera_position",
     "project_points_orthographic",
+    "project_points_perspective",
 ]
 
 
@@ -150,5 +153,62 @@ def project_points_orthographic(
 
     proj_x = fx * cam_coords[:, 0] + cx
     proj_y = fy * cam_coords[:, 1] + cy
+
+    return proj_x, proj_y
+
+
+def build_perspective_K(
+    width: int, height: int, fov_deg: float = 60.0
+) -> torch.Tensor:
+    """Build intrinsic matrix for perspective projection.
+
+    Args:
+        width: image width in pixels
+        height: image height in pixels
+        fov_deg: vertical field of view in degrees
+
+    Returns:
+        [3, 3] intrinsic matrix
+    """
+    fov_rad = np.radians(fov_deg)
+    fy = height / (2 * np.tan(fov_rad / 2))
+    fx = fy  # Square pixels
+    cx = width / 2.0
+    cy = height / 2.0
+
+    return torch.tensor(
+        [[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=torch.float32
+    )
+
+
+def project_points_perspective(
+    points: torch.Tensor, viewmat: torch.Tensor, K: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Project 3D points to 2D using perspective projection.
+
+    This is a backwards-compatible standalone function.
+    For the new class-based API, use camera.project().
+
+    Args:
+        points: [N, 3] points in world coordinates
+        viewmat: [4, 4] view matrix
+        K: [3, 3] intrinsic matrix
+
+    Returns:
+        proj_x: [N,] x pixel coordinates
+        proj_y: [N,] y pixel coordinates
+    """
+    N = points.shape[0]
+    points_homo = torch.cat([points, torch.ones(N, 1, device=points.device)], dim=1)
+    cam_coords = (viewmat @ points_homo.T).T[:, :3]
+
+    # Perspective divide (z is depth, negative because camera looks along -z)
+    z = -cam_coords[:, 2].clamp(min=1e-6)
+
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+
+    proj_x = fx * cam_coords[:, 0] / z + cx
+    proj_y = fy * cam_coords[:, 1] / z + cy
 
     return proj_x, proj_y

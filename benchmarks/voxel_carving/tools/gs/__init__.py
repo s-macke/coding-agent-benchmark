@@ -8,12 +8,15 @@ from .camera import (
     OrthographicCamera,
     PerspectiveCamera,
     CameraCollection,
+    CameraType,
     # Backwards-compatible functions
     build_cameras,
     build_view_matrix,
     build_orthographic_K,
+    build_perspective_K,
     compute_camera_position,
     project_points_orthographic,
+    project_points_perspective,
 )
 from .render import render_gaussians_simple, try_gsplat_render
 
@@ -29,12 +32,15 @@ __all__ = [
     'OrthographicCamera',
     'PerspectiveCamera',
     'CameraCollection',
+    'CameraType',
     # Camera functions (backwards compatible)
     'build_cameras',
     'build_view_matrix',
     'build_orthographic_K',
+    'build_perspective_K',
     'compute_camera_position',
     'project_points_orthographic',
+    'project_points_perspective',
     # Render
     'render_gaussians_simple',
     'try_gsplat_render',
