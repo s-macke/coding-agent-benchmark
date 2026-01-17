@@ -5,8 +5,8 @@ from typing import Optional, Tuple
 
 import torch
 
-from .cameras import Cameras
-from .gaussians import Gaussians
+from ..cameras import Cameras
+from ..gaussians import Gaussians
 
 
 def render_gsplat(

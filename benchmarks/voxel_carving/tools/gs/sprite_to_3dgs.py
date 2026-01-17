@@ -28,8 +28,7 @@ from .device import get_device
 from .gaussians import Gaussians, export_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule
-from .render_simple import render_gaussians_simple
-from .render_gsplat import render_gsplat
+from .render import render_gaussians_simple, render_gsplat
 from .train_args import TrainConfig, parse_args
 from .voxel_carving import initialize_from_visual_hull
 

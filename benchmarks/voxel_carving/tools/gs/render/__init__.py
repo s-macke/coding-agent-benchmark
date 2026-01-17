@@ -1,13 +1,15 @@
-"""Gaussian rendering with automatic fallback."""
+"""Gaussian rendering modules."""
 
 from typing import Tuple
 
 import torch
 
-from .cameras import Cameras
-from .gaussians import Gaussians
-from .render_gsplat import render_gsplat
-from .render_points_fast import render_points_fast
+from ..cameras import Cameras
+from ..gaussians import Gaussians
+from .gsplat import render_gsplat
+from .points_fast import render_points_fast
+from .simple import render_gaussians_simple
+from .projection import project_points
 
 
 def render_gaussians(
@@ -30,3 +32,12 @@ def render_gaussians(
         return result[0][0], result[1][0]
 
     return render_points_fast(gaussians, cameras)
+
+
+__all__ = [
+    'render_gaussians',
+    'render_gsplat',
+    'render_gaussians_simple',
+    'render_points_fast',
+    'project_points',
+]
