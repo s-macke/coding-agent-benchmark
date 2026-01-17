@@ -24,7 +24,7 @@ def project_points(
     cx, cy = K[0, 2], K[1, 2]
 
     if is_perspective:
-        z = (-cam_coords[:, 2]).clamp(min=1e-6)
+        z = cam_coords[:, 2].clamp(min=1e-6)
         proj_x = fx * cam_coords[:, 0] / z + cx
         proj_y = fy * cam_coords[:, 1] / z + cy
     else:

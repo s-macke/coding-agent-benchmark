@@ -31,7 +31,9 @@ def render_gaussians(
     if result is not None:
         return result[0][0], result[1][0]
 
-    return render_points_fast(gaussians, cameras)
+    #result = render_gaussians_simple(gaussians, cameras)
+    result = render_points_fast(gaussians, cameras)
+    return result[0][0], result[1][0]
 
 
 __all__ = [

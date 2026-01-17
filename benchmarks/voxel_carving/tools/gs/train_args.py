@@ -25,6 +25,7 @@ class TrainingArgs:
     camera_type: CameraType
     ortho_scale: float
     fov: float
+    distance: float
     train: TrainConfig
 
 
@@ -43,6 +44,8 @@ def parse_args() -> TrainingArgs:
                         help='Orthographic scale (only for orthographic camera)')
     parser.add_argument('--fov', type=float, default=60.0,
                         help='Field of view in degrees (only for perspective camera)')
+    parser.add_argument('--distance', type=float, default=5.0,
+                        help='Camera distance from origin')
     parser.add_argument('--pose-opt', action='store_true',
                         help='Enable camera pose optimization during training')
     parser.add_argument('--fix-positions', action='store_true',
@@ -56,6 +59,7 @@ def parse_args() -> TrainingArgs:
         camera_type=CameraType(args.camera_type),
         ortho_scale=args.ortho_scale,
         fov=args.fov,
+        distance=args.distance,
         train=TrainConfig(
             num_iterations=args.iterations,
             lr=args.lr,

@@ -203,6 +203,7 @@ def main() -> None:
         camera_type=args.camera_type,
         ortho_scale=args.ortho_scale,
         fov_deg=args.fov,
+        distance=args.distance,
     )
     print(f"  Loaded {len(cameras)} cameras")
 

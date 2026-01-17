@@ -79,8 +79,8 @@ class PerspectiveCamera(Camera):
         points_homo = torch.cat([points, torch.ones(N, 1, device=device)], dim=1)
         cam_coords = (viewmat @ points_homo.T).T[:, :3]
 
-        # Perspective divide (z is depth, negative because camera looks along -z)
-        z = -cam_coords[:, 2].clamp(min=1e-6)
+        # Perspective divide (positive z is forward in camera space)
+        z = cam_coords[:, 2].clamp(min=1e-6)
 
         # Apply intrinsic matrix with perspective divide
         K = self.K.to(device)

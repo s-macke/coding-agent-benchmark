@@ -51,7 +51,7 @@ def _render_single(
 
     # Project to pixel coordinates
     proj_x, proj_y = project_points(cam_means, K, is_perspective)
-    depths = -cam_means[:, 2]  # Negative z is forward
+    depths = cam_means[:, 2]  # Positive z is forward
 
     actual_scales = torch.exp(scales)
     actual_opacities = torch.sigmoid(opacities)

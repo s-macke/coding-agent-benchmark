@@ -82,6 +82,7 @@ def load_cameras(
     camera_type: CameraType = CameraType.ORTHOGRAPHIC,
     ortho_scale: float = 2.0,
     fov_deg: float = 60.0,
+    distance: float = 5.0,
 ) -> "CameraCollection":
     """Load sprites and build camera collection.
 
@@ -93,6 +94,7 @@ def load_cameras(
         camera_type: CameraType.ORTHOGRAPHIC or CameraType.PERSPECTIVE
         ortho_scale: (orthographic) world units visible in half the image
         fov_deg: (perspective) vertical field of view in degrees
+        distance: camera distance from origin
 
     Returns:
         CameraCollection with cameras and images
@@ -105,4 +107,5 @@ def load_cameras(
         camera_type=camera_type,
         ortho_scale=ortho_scale,
         fov_deg=fov_deg,
+        distance=distance,
     )

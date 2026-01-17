@@ -40,6 +40,7 @@ class RenderArgs:
     camera_type: CameraType
     ortho_scale: float
     fov: float
+    distance: float
 
 
 def parse_args() -> RenderArgs:
@@ -54,6 +55,8 @@ def parse_args() -> RenderArgs:
                         help='Orthographic scale (only for orthographic camera)')
     parser.add_argument('--fov', type=float, default=60.0,
                         help='Field of view in degrees (only for perspective camera)')
+    parser.add_argument('--distance', type=float, default=5.0,
+                        help='Camera distance from origin')
     args = parser.parse_args()
 
     return RenderArgs(
@@ -63,6 +66,7 @@ def parse_args() -> RenderArgs:
         camera_type=CameraType(args.camera_type),
         ortho_scale=args.ortho_scale,
         fov=args.fov,
+        distance=args.distance,
     )
 
 
@@ -151,6 +155,7 @@ def main() -> None:
         camera_type=args.camera_type,
         ortho_scale=args.ortho_scale,
         fov_deg=args.fov,
+        distance=args.distance,
     )
     print(f"  Loaded {len(cameras)} cameras")
 

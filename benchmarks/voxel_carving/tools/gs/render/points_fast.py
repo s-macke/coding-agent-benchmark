@@ -47,7 +47,7 @@ def _render_single(
     proj_x, proj_y = project_points(cam_means, K, is_perspective)
     proj_x = proj_x.long()
     proj_y = proj_y.long()
-    depths = -cam_means[:, 2]
+    depths = cam_means[:, 2]
 
     # Filter to valid pixels
     valid = (proj_x >= 0) & (proj_x < width) & (proj_y >= 0) & (proj_y < height)
@@ -57,8 +57,8 @@ def _render_single(
     valid_colors = colors[valid]
     valid_opacities = torch.sigmoid(opacities[valid])
 
-    # Initialize output with white background
-    render_rgb = torch.ones(height, width, 3, device=device)
+    # Initialize output with black background
+    render_rgb = torch.zeros(height, width, 3, device=device)
     render_alpha = torch.zeros(height, width, 1, device=device)
 
     flat_rgb = render_rgb.view(-1, 3)
