@@ -29,7 +29,7 @@ from PIL import Image
 from .cameras import Cameras
 from .constants import SPRITES_JSON, SPRITES_DIR
 from .device import get_device
-from .gaussians import Gaussians, export_ply
+from .gaussians import Gaussians, export_ply, expand_symmetric, filter_positive_y
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule, rotation_6d_to_matrix
 from .losses import ssim
@@ -151,6 +151,11 @@ def train_gaussians(
     device = get_device(config.device)
     sh_degree = init_gaussians.sh_degree
 
+    # For symmetric mode, filter to canonical half (y >= 0)
+    if config.symmetric:
+        init_gaussians = filter_positive_y(init_gaussians)
+        print(f"  Symmetric mode: using {init_gaussians.num_gaussians} canonical Gaussians (y >= 0)")
+
     images = cameras.images
     targets = torch.stack(images).to(device)
     target_rgb = targets[:, :, :, :3]
@@ -205,6 +210,8 @@ def train_gaussians(
     # Test if gsplat works
     sh_full = torch.cat([sh0, shN], dim=1)
     test_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
+    if config.symmetric:
+        test_gaussians = expand_symmetric(test_gaussians)
     gsplat_result = render_gsplat(test_gaussians, cams[:1])
     use_gsplat = gsplat_result is not None
 
@@ -220,6 +227,10 @@ def train_gaussians(
         # Concatenate SH coefficients and create Gaussians for rendering
         sh_full = torch.cat([sh0, shN], dim=1)
         current_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
+
+        # For symmetric mode, expand canonical half to full model before rendering
+        if config.symmetric:
+            current_gaussians = expand_symmetric(current_gaussians)
 
         # Apply pose adjustment if enabled
         current_cams = cams
@@ -290,6 +301,9 @@ def train_gaussians(
                     opacities=opacities.detach(),
                     sh_coeffs=sh_full.detach(),
                 )
+                # Expand symmetric model for saving/rendering
+                if config.symmetric:
+                    checkpoint_gaussians = expand_symmetric(checkpoint_gaussians)
                 if output_path is not None:
                     export_ply(checkpoint_gaussians, str(output_path))
                     print(f"  Saved {output_path}")
@@ -306,13 +320,19 @@ def train_gaussians(
     # Reconstruct full SH coefficients
     sh_coeffs_out = torch.cat([sh0, shN], dim=1)
 
-    return Gaussians(
+    result = Gaussians(
         means=means.detach().cpu(),
         scales=scales.detach().cpu(),
         quats=quats.detach().cpu(),
         opacities=opacities.detach().cpu(),
         sh_coeffs=sh_coeffs_out.detach().cpu(),
     )
+
+    # Expand symmetric model for final output
+    if config.symmetric:
+        result = expand_symmetric(result)
+
+    return result
 
 
 def main() -> None:

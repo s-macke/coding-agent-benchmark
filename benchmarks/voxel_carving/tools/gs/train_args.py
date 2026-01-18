@@ -22,6 +22,7 @@ class TrainConfig:
     pose_opt: bool = False
     fix_positions: bool = False
     loss_type: LossType = LossType.L1_SSIM
+    symmetric: bool = False
 
 
 @dataclass
@@ -66,6 +67,8 @@ def parse_args() -> TrainingArgs:
                         help='Render all views after training')
     parser.add_argument('--render-dir', default='renders',
                         help='Output directory for rendered images')
+    parser.add_argument('--symmetric', action='store_true',
+                        help='Enable y-axis mirror symmetry (halves Gaussian count)')
     args = parser.parse_args()
 
     return TrainingArgs(
@@ -85,5 +88,6 @@ def parse_args() -> TrainingArgs:
             pose_opt=args.pose_opt,
             fix_positions=args.fix_positions,
             loss_type=LossType(args.loss_type),
+            symmetric=args.symmetric,
         ),
     )
