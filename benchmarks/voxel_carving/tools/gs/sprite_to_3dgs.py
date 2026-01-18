@@ -17,7 +17,9 @@ Options:
     --fov FLOAT         Perspective field of view in degrees (default: 60.0)
 """
 
+import math
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import torch
@@ -29,7 +31,7 @@ from .constants import SPRITES_JSON, SPRITES_DIR
 from .device import get_device
 from .gaussians import Gaussians, export_ply
 from .sprites import load_cameras
-from .camera import CameraCollection, CameraOptModule
+from .camera import CameraCollection, CameraOptModule, rotation_6d_to_matrix
 from .losses import ssim
 from .render import render_gaussians, render_gaussians_simple, render_gsplat
 from .train_args import LossType, TrainConfig, parse_args
@@ -44,6 +46,7 @@ SHN_LR_MULTIPLIER = 0.0125  # Higher-order SH (1/20 of SH0, from gsplat)
 ALPHA_LOSS_WEIGHT = 0.5
 OPACITY_REG_WEIGHT = 0.01
 LOG_INTERVAL = 500
+CHECKPOINT_INTERVAL = 5000
 
 # Camera pose optimization constants
 POSE_OPT_LR = 1e-5  # Base learning rate for pose optimization
@@ -53,10 +56,84 @@ POSE_OPT_WEIGHT_DECAY = 1e-6  # Regularization for pose parameters
 CLAMP_EPSILON = 1e-6
 
 
+def render_all_views(
+    gaussians: Gaussians,
+    cameras: CameraCollection,
+    render_dir: Path,
+    device: torch.device,
+    resolution: int = 512,
+) -> None:
+    """Render all camera views and save as PNG images.
+
+    Args:
+        gaussians: Gaussian splat model to render
+        cameras: camera collection defining viewpoints
+        render_dir: directory to save rendered images
+        device: torch device for rendering
+        resolution: output image resolution (default 512x512)
+    """
+    render_dir.mkdir(exist_ok=True)
+    render_cams = cameras.to_cameras().with_resolution(resolution, resolution).to(device)
+    gaussians_gpu = gaussians.to(device)
+
+    num_views = len(render_cams)
+    for i in range(num_views):
+        rgb, alpha = render_gaussians(gaussians_gpu, render_cams[i])
+        rgb = rgb * alpha  # composite over black
+        img = (rgb.cpu().numpy() * 255).clip(0, 255).astype(np.uint8)
+        Image.fromarray(img).save(render_dir / f"view_{i:02d}.png")
+
+
+def print_pose_adjustments(
+    pose_adjust: CameraOptModule,
+    cameras: CameraCollection,
+) -> None:
+    """Print learned camera pose adjustments compared to original values.
+
+    Args:
+        pose_adjust: trained pose optimization module
+        cameras: original camera collection
+    """
+    num_views = len(cameras)
+    print("\nCamera pose adjustments:")
+    print(f"  {'Cam':>3}  {'------- Original -------':^26}  {'-------- Delta --------':^25}")
+    print(f"  {'':>3}  {'pitch':>7} {'yaw':>7} {'dist':>6} {'fov':>5}  {'pitch':>8} {'yaw':>8} {'dist':>8}")
+    with torch.no_grad():
+        weights = pose_adjust.embeds.weight
+        for cam_idx in range(num_views):
+            cam = cameras[cam_idx]
+            orig_pitch = cam.pitch_deg if cam.pitch_deg is not None else 0.0
+            orig_yaw = cam.yaw_deg if cam.yaw_deg is not None else 0.0
+            orig_dist = float(np.linalg.norm(cam.position))
+
+            # FOV for perspective, ortho_scale for orthographic
+            if hasattr(cam, 'fov_deg'):
+                fov_str = f"{cam.fov_deg:.0f}°"
+            else:
+                fov_str = "ortho"
+
+            delta = weights[cam_idx]
+            dx = delta[:3]  # translation delta
+            drot6d = delta[3:] + pose_adjust.identity_rot6d
+            rot_mat = rotation_6d_to_matrix(drot6d)
+
+            delta_yaw = math.degrees(math.atan2(rot_mat[1, 0].item(), rot_mat[0, 0].item()))
+            delta_pitch = math.degrees(math.atan2(
+                -rot_mat[2, 0].item(),
+                math.sqrt(rot_mat[2, 1].item()**2 + rot_mat[2, 2].item()**2)
+            ))
+            delta_dist = float(torch.linalg.norm(dx))
+
+            print(f"  {cam_idx:3d}  {orig_pitch:+7.1f} {orig_yaw:+7.1f} {orig_dist:6.2f} {fov_str:>5}  "
+                  f"{delta_pitch:+8.3f} {delta_yaw:+8.3f} {delta_dist:+8.4f}")
+
+
 def train_gaussians(
     cameras: CameraCollection,
     init_gaussians: Gaussians,
     config: TrainConfig,
+    output_path: Optional[Path] = None,
+    render_dir: Optional[Path] = None,
 ) -> Gaussians:
     """
     Optimize Gaussian parameters to match target sprite views.
@@ -65,6 +142,8 @@ def train_gaussians(
         cameras: camera collection with images
         init_gaussians: initial Gaussians to optimize
         config: training configuration
+        output_path: optional path for saving checkpoints
+        render_dir: optional directory for rendering checkpoint images
 
     Returns:
         Optimized Gaussians object
@@ -200,6 +279,30 @@ def train_gaussians(
                 log_msg += f", ssim={ssim_val.item():.4f}"
             print(log_msg)
 
+        # Save model, render views, and show pose adjustments every CHECKPOINT_INTERVAL
+        if iteration > 0 and iteration % CHECKPOINT_INTERVAL == 0:
+            if output_path is not None or render_dir is not None:
+                sh_full = torch.cat([sh0, shN], dim=1)
+                checkpoint_gaussians = Gaussians(
+                    means=means.detach(),
+                    scales=scales.detach(),
+                    quats=quats.detach(),
+                    opacities=opacities.detach(),
+                    sh_coeffs=sh_full.detach(),
+                )
+                if output_path is not None:
+                    export_ply(checkpoint_gaussians, str(output_path))
+                    print(f"  Saved {output_path}")
+                if render_dir is not None:
+                    render_all_views(checkpoint_gaussians, cameras, render_dir, device)
+                    print(f"  Rendered views to {render_dir}")
+            if pose_adjust is not None:
+                print_pose_adjustments(pose_adjust, cameras)
+
+    # Print camera pose comparison if optimization was enabled
+    if pose_adjust is not None:
+        print_pose_adjustments(pose_adjust, cameras)
+
     # Reconstruct full SH coefficients
     sh_coeffs_out = torch.cat([sh0, shN], dim=1)
 
@@ -233,30 +336,20 @@ def main() -> None:
         num_gaussians=args.num_gaussians,
     )
 
-    print(f"Training for {args.train.num_iterations} iterations...")
-    gaussians = train_gaussians(cameras, gaussians, args.train)
-
     output_path = project_dir / args.output
+    render_dir = project_dir / args.render_dir if args.render else None
+
+    print(f"Training for {args.train.num_iterations} iterations...")
+    gaussians = train_gaussians(cameras, gaussians, args.train, output_path, render_dir)
+
     print(f"Exporting to {output_path}...")
     export_ply(gaussians, str(output_path))
 
-    if args.render:
-        print("Rendering all views at 512x512...")
-        render_dir = project_dir / args.render_dir
-        render_dir.mkdir(exist_ok=True)
-
+    if render_dir is not None:
+        print("Rendering final views at 512x512...")
         device = get_device(args.train.device)
-        render_cams = cameras.to_cameras().with_resolution(512, 512).to(device)
-        gaussians = gaussians.to(device)
-
-        num_views = len(render_cams)
-        for i in range(num_views):
-            print(f"  Rendering view {i + 1}/{num_views}...", end='\r')
-            rgb, alpha = render_gaussians(gaussians, render_cams[i])
-            rgb = rgb * alpha  # composite over black
-            img = (rgb.cpu().numpy() * 255).clip(0, 255).astype(np.uint8)
-            Image.fromarray(img).save(render_dir / f"view_{i:02d}.png")
-        print(f"\n  Saved {num_views} images to {render_dir}")
+        render_all_views(gaussians, cameras, render_dir, device)
+        print(f"  Saved {len(cameras)} images to {render_dir}")
 
     print("Done!")
 

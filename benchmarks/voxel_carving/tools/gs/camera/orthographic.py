@@ -1,6 +1,6 @@
 """Orthographic projection camera."""
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -26,6 +26,8 @@ class OrthographicCamera(Camera):
         height: int,
         image: Image.Image,
         ortho_scale: float = 2.0,
+        yaw_deg: Optional[float] = None,
+        pitch_deg: Optional[float] = None,
     ):
         """Initialize orthographic camera.
 
@@ -37,8 +39,11 @@ class OrthographicCamera(Camera):
             height: image height in pixels
             image: PIL Image captured from this camera view
             ortho_scale: world units visible in half the image
+            yaw_deg: original yaw angle in degrees (for diagnostics)
+            pitch_deg: original pitch angle in degrees (for diagnostics)
         """
-        super().__init__(position, camera_up, camera_right, width, height, image)
+        super().__init__(position, camera_up, camera_right, width, height, image,
+                         yaw_deg=yaw_deg, pitch_deg=pitch_deg)
         self.ortho_scale = ortho_scale
 
     @property
@@ -122,4 +127,6 @@ class OrthographicCamera(Camera):
             height=height,
             image=image,
             ortho_scale=ortho_scale,
+            yaw_deg=yaw_deg,
+            pitch_deg=pitch_deg,
         )

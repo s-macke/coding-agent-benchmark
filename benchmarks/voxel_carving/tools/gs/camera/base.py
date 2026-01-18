@@ -23,6 +23,8 @@ class Camera(ABC):
         width: int,
         height: int,
         image: Image.Image,
+        yaw_deg: Optional[float] = None,
+        pitch_deg: Optional[float] = None,
     ):
         """Initialize camera with position, orientation, and image.
 
@@ -33,6 +35,8 @@ class Camera(ABC):
             width: image width in pixels
             height: image height in pixels
             image: PIL Image captured from this camera view
+            yaw_deg: original yaw angle in degrees (for diagnostics)
+            pitch_deg: original pitch angle in degrees (for diagnostics)
         """
         self.position = np.asarray(position, dtype=np.float32)
         self.camera_up = np.asarray(camera_up, dtype=np.float32)
@@ -40,6 +44,8 @@ class Camera(ABC):
         self.width = width
         self.height = height
         self.image = image
+        self.yaw_deg = yaw_deg
+        self.pitch_deg = pitch_deg
 
         # Cached matrices (lazy computed)
         self._viewmat: Optional[torch.Tensor] = None

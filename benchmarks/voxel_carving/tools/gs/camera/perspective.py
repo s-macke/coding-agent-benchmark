@@ -1,6 +1,6 @@
 """Perspective projection camera."""
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -27,6 +27,8 @@ class PerspectiveCamera(Camera):
         fov_deg: float = 60.0,
         near: float = 0.1,
         far: float = 100.0,
+        yaw_deg: Optional[float] = None,
+        pitch_deg: Optional[float] = None,
     ):
         """Initialize perspective camera.
 
@@ -40,8 +42,11 @@ class PerspectiveCamera(Camera):
             fov_deg: vertical field of view in degrees
             near: near clipping plane distance
             far: far clipping plane distance
+            yaw_deg: original yaw angle in degrees (for diagnostics)
+            pitch_deg: original pitch angle in degrees (for diagnostics)
         """
-        super().__init__(position, camera_up, camera_right, width, height, image)
+        super().__init__(position, camera_up, camera_right, width, height, image,
+                         yaw_deg=yaw_deg, pitch_deg=pitch_deg)
         self.fov_deg = fov_deg
         self.near = near
         self.far = far
@@ -137,4 +142,6 @@ class PerspectiveCamera(Camera):
             fov_deg=fov_deg,
             near=near,
             far=far,
+            yaw_deg=yaw_deg,
+            pitch_deg=pitch_deg,
         )
