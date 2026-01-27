@@ -7,11 +7,13 @@ corner to the ship's center of rotation. This tool creates new images where that
 center point is placed at the center of a 128x128 canvas.
 
 Usage:
-    python center_sprites.py [--black-bg] [--output-dir DIR]
+    python center_sprites.py [--black-bg] [--output-dir DIR] [--scale4x] [--crosshair]
 
 Options:
     --black-bg      Replace transparency with black background
     --output-dir    Output directory (default: centered_images)
+    --scale4x       Scale output images by 4x using nearest neighbor
+    --crosshair     Draw horizontal and vertical lines through the center
 """
 
 import argparse
@@ -21,13 +23,13 @@ import sys
 from pathlib import Path
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageDraw
 except ImportError:
     print("Error: Pillow is required. Install with: pip install Pillow")
     sys.exit(1)
 
 
-def center_sprite(sprite_path, x_offset, y_offset, output_size=128, black_bg=False):
+def center_sprite(sprite_path, x_offset, y_offset, output_size=128, black_bg=False, scale4x=False, crosshair=False):
     """
     Create a new image with the sprite centered by its rotation point.
 
@@ -37,6 +39,8 @@ def center_sprite(sprite_path, x_offset, y_offset, output_size=128, black_bg=Fal
         y_offset: Y offset from top-left to center of rotation (negative value)
         output_size: Size of the output square image
         black_bg: If True, replace transparency with black
+        scale4x: If True, scale output by 4x using nearest neighbor
+        crosshair: If True, draw horizontal and vertical lines through center
 
     Returns:
         PIL.Image: The centered image
@@ -48,8 +52,8 @@ def center_sprite(sprite_path, x_offset, y_offset, output_size=128, black_bg=Fal
     # so that the center of rotation ends up at the canvas center
     # x_offset is negative, e.g., -56 means center is 56 pixels right of top-left
     center = output_size // 2
-    paste_x = center + x_offset  # e.g., 64 + (-56) = 8
-    paste_y = center + y_offset  # e.g., 64 + (-34) = 30
+    paste_x = center + x_offset-2  # e.g., 64 + (-56) = 8
+    paste_y = center + y_offset-2  # e.g., 64 + (-34) = 30
 
     # Create the output canvas
     if black_bg:
@@ -64,6 +68,22 @@ def center_sprite(sprite_path, x_offset, y_offset, output_size=128, black_bg=Fal
     if black_bg:
         background = Image.new('RGBA', (output_size, output_size), (0, 0, 0, 255))
         canvas = Image.alpha_composite(background, canvas)
+
+    # Scale by 4x using nearest neighbor (no interpolation)
+    if scale4x:
+        new_size = output_size * 4
+        canvas = canvas.resize((new_size, new_size), Image.NEAREST)
+        center = new_size // 2
+
+    # Draw crosshair lines through center
+    if crosshair:
+        draw = ImageDraw.Draw(canvas)
+        width, height = canvas.size
+        line_color = (255, 0, 0, 255)  # Red
+        # Horizontal line
+        draw.line([(0, center), (width, center)], fill=line_color, width=1)
+        # Vertical line
+        draw.line([(center, 0), (center, height)], fill=line_color, width=1)
 
     return canvas
 
@@ -88,6 +108,16 @@ def main():
         default=128,
         help='Output image size (default: 128)'
     )
+    parser.add_argument(
+        '--scale4x',
+        action='store_true',
+        help='Scale output images by 4x using nearest neighbor (no interpolation)'
+    )
+    parser.add_argument(
+        '--crosshair',
+        action='store_true',
+        help='Draw horizontal and vertical lines through the center'
+    )
     args = parser.parse_args()
 
     # Determine paths relative to the script location
@@ -110,9 +140,11 @@ def main():
     output_dir.mkdir(exist_ok=True)
 
     print(f"Processing {len(data['sprites'])} sprites...")
-    print(f"Output size: {args.size}x{args.size}")
+    print(f"Output size: {args.size}x{args.size}" + (f" (scaled to {args.size*4}x{args.size*4})" if args.scale4x else ""))
     print(f"Output directory: {output_dir}")
     print(f"Black background: {args.black_bg}")
+    print(f"Scale 4x: {args.scale4x}")
+    print(f"Crosshair: {args.crosshair}")
     print()
 
     processed = 0
@@ -143,22 +175,26 @@ def main():
                 x_offset,
                 y_offset,
                 output_size=args.size,
-                black_bg=args.black_bg
+                black_bg=args.black_bg,
+                scale4x=args.scale4x,
+                crosshair=args.crosshair
             )
             centered.save(output_path)
             processed += 1
             print(f"  Block {block:02d}: {filename} -> {output_filename}")
 
             # Build centered sprite metadata
+            actual_size = args.size * 4 if args.scale4x else args.size
+            actual_center = actual_size // 2
             centered_sprite = {
                 'block': sprite['block'],
                 'row': sprite['row'],
                 'yaw': sprite['yaw'],
                 'pitch': sprite['pitch'],
-                'width': args.size,
-                'height': args.size,
-                'x': -center,
-                'y': -center,
+                'width': actual_size,
+                'height': actual_size,
+                'x': -actual_center,
+                'y': -actual_center,
                 'filename': output_filename,
             }
             # Copy optional fields
