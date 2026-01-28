@@ -46,7 +46,7 @@ SHN_LR_MULTIPLIER = 0.0125  # Higher-order SH (1/20 of SH0, from gsplat)
 ALPHA_LOSS_WEIGHT = 0.5
 OPACITY_REG_WEIGHT = 0.01
 LOG_INTERVAL = 500
-CHECKPOINT_INTERVAL = 5000
+CHECKPOINT_INTERVAL = 1000
 
 # Camera pose optimization constants
 POSE_OPT_LR = 1e-5  # Base learning rate for pose optimization
@@ -161,6 +161,13 @@ def train_gaussians(
     target_rgb = targets[:, :, :, :3]
     target_alpha = targets[:, :, :, 3:4]
 
+    # Get per-image weights (normalized)
+    if cameras.weights is not None:
+        image_weights = cameras.weights.to(device)
+        image_weights = image_weights / image_weights.sum()
+    else:
+        image_weights = torch.ones(len(images), device=device) / len(images)
+
     # Convert cameras to Cameras dataclass
     cams = cameras.to_cameras().to(device)
 
@@ -250,8 +257,9 @@ def train_gaussians(
         else:
             render_colors, render_alphas = render_gaussians_simple(current_gaussians, current_cams)
 
-        # L1 loss (masked by alpha)
-        l1_loss = (torch.abs(render_colors - target_rgb) * target_alpha).mean()
+        # L1 loss (masked by alpha) - compute per-image then weight
+        per_image_l1 = (torch.abs(render_colors - target_rgb) * target_alpha).mean(dim=(1, 2, 3))
+        l1_loss = (per_image_l1 * image_weights).sum()
 
         if config.loss_type == LossType.L1_SSIM:
             # SSIM loss on RGB (permute to [N,C,H,W] for conv2d)
@@ -265,11 +273,13 @@ def train_gaussians(
             ssim_val = torch.tensor(0.0, device=l1_loss.device)
             rgb_loss = l1_loss
 
-        alpha_loss = F.binary_cross_entropy(
+        # Alpha loss - compute per-image then weight
+        per_image_alpha = F.binary_cross_entropy(
             render_alphas.clamp(CLAMP_EPSILON, 1 - CLAMP_EPSILON),
             target_alpha,
-            reduction='mean'
-        )
+            reduction='none'
+        ).mean(dim=(1, 2, 3))
+        alpha_loss = (per_image_alpha * image_weights).sum()
 
         opacity_reg = torch.sigmoid(opacities).mean() * OPACITY_REG_WEIGHT
 

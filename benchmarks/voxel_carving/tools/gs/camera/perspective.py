@@ -27,6 +27,7 @@ class PerspectiveCamera(Camera):
         fov_deg: float = 60.0,
         near: float = 0.1,
         far: float = 100.0,
+        weight: float = 1.0,
         yaw_deg: Optional[float] = None,
         pitch_deg: Optional[float] = None,
     ):
@@ -42,11 +43,12 @@ class PerspectiveCamera(Camera):
             fov_deg: vertical field of view in degrees
             near: near clipping plane distance
             far: far clipping plane distance
+            weight: importance weight for this camera (default 1.0)
             yaw_deg: original yaw angle in degrees (for diagnostics)
             pitch_deg: original pitch angle in degrees (for diagnostics)
         """
         super().__init__(position, camera_up, camera_right, width, height, image,
-                         yaw_deg=yaw_deg, pitch_deg=pitch_deg)
+                         weight=weight, yaw_deg=yaw_deg, pitch_deg=pitch_deg)
         self.fov_deg = fov_deg
         self.near = near
         self.far = far
@@ -111,6 +113,7 @@ class PerspectiveCamera(Camera):
         fov_deg: float = 60.0,
         near: float = 0.1,
         far: float = 100.0,
+        weight: float = 1.0,
     ) -> "PerspectiveCamera":
         """Create camera from yaw/pitch angles.
 
@@ -126,6 +129,7 @@ class PerspectiveCamera(Camera):
             fov_deg: vertical field of view in degrees
             near: near clipping plane distance
             far: far clipping plane distance
+            weight: importance weight for this camera (default 1.0)
 
         Returns:
             PerspectiveCamera instance
@@ -144,4 +148,5 @@ class PerspectiveCamera(Camera):
             far=far,
             yaw_deg=yaw_deg,
             pitch_deg=pitch_deg,
+            weight=weight,
         )

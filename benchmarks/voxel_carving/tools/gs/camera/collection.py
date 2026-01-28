@@ -30,7 +30,7 @@ class CameraCollection:
         """Initialize collection from list of cameras.
 
         Args:
-            cameras: list of Camera objects
+            cameras: list of Camera objects (each camera has its own weight attribute)
         """
         self._cameras = cameras
         self._viewmats: Optional[torch.Tensor] = None
@@ -74,6 +74,11 @@ class CameraCollection:
     def images(self) -> List[torch.Tensor]:
         """List of [H, W, 4] RGBA tensors (float32, 0-1)."""
         return [c.image_tensor for c in self._cameras]
+
+    @property
+    def weights(self) -> torch.Tensor:
+        """[C] per-camera importance weights."""
+        return torch.tensor([c.weight for c in self._cameras], dtype=torch.float32)
 
     def to_tensors(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Return (viewmats, Ks) tuple for backwards compatibility.
@@ -144,6 +149,7 @@ class CameraCollection:
 
         cameras = []
         for sprite in sprites:
+            sprite_weight = getattr(sprite, 'weight', 1.0)
             if camera_type == CameraType.ORTHOGRAPHIC:
                 camera = OrthographicCamera.from_angles(
                     yaw_deg=sprite.yaw,
@@ -155,6 +161,7 @@ class CameraCollection:
                     width=width,
                     height=height,
                     ortho_scale=ortho_scale,
+                    weight=sprite_weight,
                 )
             elif camera_type == CameraType.PERSPECTIVE:
                 camera = PerspectiveCamera.from_angles(
@@ -169,8 +176,10 @@ class CameraCollection:
                     fov_deg=fov_deg,
                     near=near,
                     far=far,
+                    weight=sprite_weight,
                 )
             else:
                 raise ValueError(f"Unknown camera type: {camera_type}")
             cameras.append(camera)
+
         return cls(cameras)

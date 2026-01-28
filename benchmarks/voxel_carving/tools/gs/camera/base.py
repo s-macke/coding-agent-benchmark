@@ -23,6 +23,7 @@ class Camera(ABC):
         width: int,
         height: int,
         image: Image.Image,
+        weight: float = 1.0,
         yaw_deg: Optional[float] = None,
         pitch_deg: Optional[float] = None,
     ):
@@ -35,6 +36,7 @@ class Camera(ABC):
             width: image width in pixels
             height: image height in pixels
             image: PIL Image captured from this camera view
+            weight: importance weight for this camera (default 1.0)
             yaw_deg: original yaw angle in degrees (for diagnostics)
             pitch_deg: original pitch angle in degrees (for diagnostics)
         """
@@ -46,6 +48,7 @@ class Camera(ABC):
         self.image = image
         self.yaw_deg = yaw_deg
         self.pitch_deg = pitch_deg
+        self.weight = weight
 
         # Cached matrices (lazy computed)
         self._viewmat: Optional[torch.Tensor] = None

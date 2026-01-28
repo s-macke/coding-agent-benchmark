@@ -26,6 +26,7 @@ class OrthographicCamera(Camera):
         height: int,
         image: Image.Image,
         ortho_scale: float = 2.0,
+        weight: float = 1.0,
         yaw_deg: Optional[float] = None,
         pitch_deg: Optional[float] = None,
     ):
@@ -39,11 +40,12 @@ class OrthographicCamera(Camera):
             height: image height in pixels
             image: PIL Image captured from this camera view
             ortho_scale: world units visible in half the image
+            weight: importance weight for this camera (default 1.0)
             yaw_deg: original yaw angle in degrees (for diagnostics)
             pitch_deg: original pitch angle in degrees (for diagnostics)
         """
         super().__init__(position, camera_up, camera_right, width, height, image,
-                         yaw_deg=yaw_deg, pitch_deg=pitch_deg)
+                         weight=weight, yaw_deg=yaw_deg, pitch_deg=pitch_deg)
         self.ortho_scale = ortho_scale
 
     @property
@@ -100,6 +102,7 @@ class OrthographicCamera(Camera):
         width: int = 128,
         height: int = 128,
         ortho_scale: float = 2.0,
+        weight: float = 1.0,
     ) -> "OrthographicCamera":
         """Create camera from yaw/pitch angles.
 
@@ -113,6 +116,7 @@ class OrthographicCamera(Camera):
             width: image width in pixels
             height: image height in pixels
             ortho_scale: world units visible in half the image
+            weight: importance weight for this camera (default 1.0)
 
         Returns:
             OrthographicCamera instance
@@ -129,4 +133,5 @@ class OrthographicCamera(Camera):
             ortho_scale=ortho_scale,
             yaw_deg=yaw_deg,
             pitch_deg=pitch_deg,
+            weight=weight,
         )
