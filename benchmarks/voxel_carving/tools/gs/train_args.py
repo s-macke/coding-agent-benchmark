@@ -46,6 +46,7 @@ class TrainingArgs:
     render: bool
     render_dir: str
     train: TrainConfig
+    init_ply: str | None = None
 
 
 def parse_args() -> TrainingArgs:
@@ -77,6 +78,8 @@ def parse_args() -> TrainingArgs:
                         help='Output directory for rendered images')
     parser.add_argument('--symmetric', action='store_true',
                         help='Enable y-axis mirror symmetry (halves Gaussian count)')
+    parser.add_argument('--init-ply', type=str, default=None,
+                        help='Path to .ply file to initialize Gaussians from (skips voxel carving)')
     args = parser.parse_args()
 
     return TrainingArgs(
@@ -97,4 +100,5 @@ def parse_args() -> TrainingArgs:
             loss_type=LossType(args.loss_type),
             symmetric=args.symmetric,
         ),
+        init_ply=args.init_ply,
     )

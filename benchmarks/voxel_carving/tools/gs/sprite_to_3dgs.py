@@ -29,7 +29,7 @@ from PIL import Image
 from .cameras import Cameras
 from .constants import SPRITES_JSON, SPRITES_DIR
 from .device import get_device
-from .gaussians import Gaussians, export_ply, expand_symmetric, filter_positive_y
+from .gaussians import Gaussians, export_ply, expand_symmetric, filter_positive_y, load_ply
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule, rotation_6d_to_matrix
 from .losses import ssim
@@ -380,11 +380,15 @@ def main() -> None:
     )
     print(f"  Loaded {len(cameras)} cameras")
 
-    gaussians = initialize_from_visual_hull(
-        cameras,
-        resolution=args.resolution,
-        num_gaussians=args.num_gaussians,
-    )
+    if args.init_ply:
+        gaussians = load_ply(args.init_ply)
+        print(f"  Loaded {gaussians.num_gaussians} Gaussians from {args.init_ply}")
+    else:
+        gaussians = initialize_from_visual_hull(
+            cameras,
+            resolution=args.resolution,
+            num_gaussians=args.num_gaussians,
+        )
 
     output_path = project_dir / args.output
     render_dir = project_dir / args.render_dir if args.render else None
