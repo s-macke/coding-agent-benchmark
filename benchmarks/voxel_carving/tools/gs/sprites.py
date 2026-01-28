@@ -17,7 +17,7 @@ from .camera import CameraType
 class SpriteData:
     """Typed sprite metadata from JSON with associated image.
 
-    All fields except row and type are required.
+    All fields except row, type, and weight are required.
     """
     block: int
     yaw: float
@@ -32,6 +32,7 @@ class SpriteData:
     image: Image.Image
     row: Optional[int] = None
     type: Optional[str] = None
+    weight: float = 1.0
 
 
 def load_sprites(json_path: Path, images_dir: Path) -> List[SpriteData]:
@@ -56,8 +57,9 @@ def load_sprites(json_path: Path, images_dir: Path) -> List[SpriteData]:
     for sprite in data['sprites']:
         img_path = images_dir / sprite['filename']
         img = Image.open(img_path).convert('RGBA')
-        # Scale by 2x with bilinear interpolation
-        # img = img.resize((img.width * 1, img.height * 1), Image.Resampling.BILINEAR)
+        # Scale
+        #img = img.resize((img.width * 1, img.height * 1), Image.Resampling.BILINEAR)
+        #img = img.resize((img.width * 1, img.height * 1), Image.Resampling.NEAREST)
 
         sprites.append(SpriteData(
             block=sprite['block'],
@@ -73,6 +75,7 @@ def load_sprites(json_path: Path, images_dir: Path) -> List[SpriteData]:
             image=img,
             row=sprite.get('row'),
             type=sprite.get('type'),
+            weight=sprite.get('weight', 1.0),
         ))
 
     return sprites
