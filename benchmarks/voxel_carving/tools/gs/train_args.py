@@ -13,14 +13,22 @@ class LossType(str, Enum):
     L1_SSIM = "l1_ssim"
 
 
+class TrainMode(str, Enum):
+    """What to optimize during training."""
+    SPLATS = "splats"           # Optimize all Gaussian splat parameters
+    SPLATS_NO_POS = "splats-pos"  # Optimize splats except positions
+    CAMERA = "camera"           # Only optimize camera poses (freeze splats)
+    SPLATS_CAMERA = "splats+camera"  # Optimize both splats and camera poses
+    SPLATS_NO_POS_CAMERA = "splats-pos+camera"  # Optimize splats (except positions) and camera
+
+
 @dataclass
 class TrainConfig:
     """Configuration for train_gaussians()."""
     num_iterations: int = 5000
     lr: float = 0.01
     device: str = 'cuda'
-    pose_opt: bool = False
-    fix_positions: bool = False
+    train_mode: TrainMode = TrainMode.SPLATS
     loss_type: LossType = LossType.L1_SSIM
     symmetric: bool = False
 
@@ -57,10 +65,10 @@ def parse_args() -> TrainingArgs:
                         help='Field of view in degrees (only for perspective camera)')
     parser.add_argument('--distance', type=float, default=5.0,
                         help='Camera distance from origin')
-    parser.add_argument('--pose-opt', action='store_true',
-                        help='Enable camera pose optimization during training')
-    parser.add_argument('--fix-positions', action='store_true',
-                        help='Keep Gaussian positions fixed during training')
+    parser.add_argument('--train-mode',
+                        choices=['splats', 'splats-pos', 'camera', 'splats+camera', 'splats-pos+camera'],
+                        default='splats',
+                        help='What to optimize: splats, splats-pos (no positions), camera, splats+camera, splats-pos+camera')
     parser.add_argument('--loss-type', choices=['l1', 'l1_ssim'], default='l1_ssim',
                         help='Loss function type (l1=L1 only, l1_ssim=L1+SSIM)')
     parser.add_argument('--render', action='store_true',
@@ -85,8 +93,7 @@ def parse_args() -> TrainingArgs:
             num_iterations=args.iterations,
             lr=args.lr,
             device=args.device,
-            pose_opt=args.pose_opt,
-            fix_positions=args.fix_positions,
+            train_mode=TrainMode(args.train_mode),
             loss_type=LossType(args.loss_type),
             symmetric=args.symmetric,
         ),

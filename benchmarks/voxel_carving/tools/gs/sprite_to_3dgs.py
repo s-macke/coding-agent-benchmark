@@ -34,7 +34,7 @@ from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule, rotation_6d_to_matrix
 from .losses import ssim
 from .render import render_gaussians, render_gaussians_simple, render_gsplat
-from .train_args import LossType, TrainConfig, parse_args
+from .train_args import LossType, TrainConfig, TrainMode, parse_args
 from .voxel_carving import initialize_from_visual_hull
 
 # Training constants
@@ -162,48 +162,63 @@ def train_gaussians(
     target_alpha = targets[:, :, :, 3:4]
 
     # Get per-image weights (normalized)
-    if cameras.weights is not None:
-        image_weights = cameras.weights.to(device)
-        image_weights = image_weights / image_weights.sum()
-    else:
-        image_weights = torch.ones(len(images), device=device) / len(images)
+    image_weights = cameras.weights.to(device)
+    image_weights = image_weights / image_weights.sum()
 
     # Convert cameras to Cameras dataclass
     cams = cameras.to_cameras().to(device)
 
+    # Determine what to optimize based on train_mode
+    optimize_splats = config.train_mode in (
+        TrainMode.SPLATS, TrainMode.SPLATS_NO_POS,
+        TrainMode.SPLATS_CAMERA, TrainMode.SPLATS_NO_POS_CAMERA
+    )
+    optimize_positions = config.train_mode in (TrainMode.SPLATS, TrainMode.SPLATS_CAMERA)
+    optimize_camera = config.train_mode in (
+        TrainMode.SPLATS_CAMERA, TrainMode.SPLATS_NO_POS_CAMERA, TrainMode.CAMERA
+    )
+
     means = init_gaussians.means.clone().to(device)
-    if not config.fix_positions:
-        means.requires_grad_(True)
-    scales = init_gaussians.scales.clone().to(device).requires_grad_(True)
-    quats = init_gaussians.quats.clone().to(device).requires_grad_(True)
-    opacities = init_gaussians.opacities.clone().to(device).requires_grad_(True)
+    scales = init_gaussians.scales.clone().to(device)
+    quats = init_gaussians.quats.clone().to(device)
+    opacities = init_gaussians.opacities.clone().to(device)
 
     # Split SH coefficients into DC (sh0) and higher order (shN)
     sh_coeffs = init_gaussians.sh_coeffs.clone().to(device)
-    sh0 = sh_coeffs[:, :1, :].clone().requires_grad_(True)  # [N, 1, 3]
-    shN = sh_coeffs[:, 1:, :].clone().requires_grad_(True)  # [N, K-1, 3]
+    sh0 = sh_coeffs[:, :1, :].clone()  # [N, 1, 3]
+    shN = sh_coeffs[:, 1:, :].clone()  # [N, K-1, 3]
 
-    # Build optimizer param groups
-    param_groups = [
-        {'params': scales, 'lr': config.lr * SCALE_LR_MULTIPLIER},
-        {'params': quats, 'lr': config.lr * QUAT_LR_MULTIPLIER},
-        {'params': opacities, 'lr': config.lr * OPACITY_LR_MULTIPLIER},
-        {'params': sh0, 'lr': config.lr * SH0_LR_MULTIPLIER},
-        {'params': shN, 'lr': config.lr * SHN_LR_MULTIPLIER},
-    ]
-    if not config.fix_positions:
-        param_groups.insert(0, {'params': means, 'lr': config.lr})
+    # Build optimizer param groups based on train_mode
+    param_groups = []
+    if optimize_splats:
+        if optimize_positions:
+            means.requires_grad_(True)
+            param_groups.append({'params': means, 'lr': config.lr})
+        else:
+            print("  Gaussian positions fixed")
+        scales.requires_grad_(True)
+        quats.requires_grad_(True)
+        opacities.requires_grad_(True)
+        sh0.requires_grad_(True)
+        shN.requires_grad_(True)
+        param_groups.extend([
+            {'params': scales, 'lr': config.lr * SCALE_LR_MULTIPLIER},
+            {'params': quats, 'lr': config.lr * QUAT_LR_MULTIPLIER},
+            {'params': opacities, 'lr': config.lr * OPACITY_LR_MULTIPLIER},
+            {'params': sh0, 'lr': config.lr * SH0_LR_MULTIPLIER},
+            {'params': shN, 'lr': config.lr * SHN_LR_MULTIPLIER},
+        ])
     else:
-        print("  Gaussian positions fixed")
+        print("  Splat parameters frozen (camera-only mode)")
 
-    optimizer = torch.optim.Adam(param_groups)
+    optimizer = torch.optim.Adam(param_groups) if param_groups else None
 
     num_views = len(cams)
 
     # Setup camera pose optimization if enabled
     pose_adjust = None
     pose_optimizer = None
-    if config.pose_opt:
+    if optimize_camera:
         import math
         pose_adjust = CameraOptModule(num_views).to(device)
         pose_adjust.zero_init()
@@ -226,8 +241,11 @@ def train_gaussians(
           f"(SH degree {sh_degree}){'' if use_gsplat else ' (slower)'}")
     print(f"  Loss type: {config.loss_type.value}")
 
+    print(f"  Train mode: {config.train_mode.value}")
+
     for iteration in range(config.num_iterations):
-        optimizer.zero_grad()
+        if optimizer is not None:
+            optimizer.zero_grad()
         if pose_optimizer is not None:
             pose_optimizer.zero_grad()
 
@@ -286,12 +304,14 @@ def train_gaussians(
         loss = rgb_loss + alpha_loss * ALPHA_LOSS_WEIGHT + opacity_reg
 
         loss.backward()
-        optimizer.step()
+        if optimizer is not None:
+            optimizer.step()
         if pose_optimizer is not None:
             pose_optimizer.step()
 
-        with torch.no_grad():
-            quats.data = F.normalize(quats.data, dim=-1)
+        if optimize_splats:
+            with torch.no_grad():
+                quats.data = F.normalize(quats.data, dim=-1)
 
         if iteration % LOG_INTERVAL == 0 or iteration == config.num_iterations - 1:
             log_msg = (f"  Iter {iteration}: loss={loss.item():.4f}, "
