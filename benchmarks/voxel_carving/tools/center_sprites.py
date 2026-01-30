@@ -7,9 +7,10 @@ corner to the ship's center of rotation. This tool creates new images where that
 center point is placed at the center of a 128x128 canvas.
 
 Usage:
-    python center_sprites.py [--black-bg] [--output-dir DIR] [--scale4x] [--crosshair]
+    python center_sprites.py --input-dir DIR [--black-bg] [--output-dir DIR] [--scale4x] [--crosshair]
 
 Options:
+    --input-dir     Input directory containing ship_sprites.json and images (required)
     --black-bg      Replace transparency with black background
     --output-dir    Output directory (default: centered_images)
     --scale4x       Scale output images by 4x using nearest neighbor
@@ -93,6 +94,11 @@ def main():
         description='Center ship sprites by their rotation point in 128x128 images.'
     )
     parser.add_argument(
+        '--input-dir',
+        required=True,
+        help='Input directory containing ship_sprites.json and images'
+    )
+    parser.add_argument(
         '--black-bg',
         action='store_true',
         help='Replace transparency with black background'
@@ -118,14 +124,25 @@ def main():
         action='store_true',
         help='Draw horizontal and vertical lines through the center'
     )
+    parser.add_argument(
+        '--orthogonal-only',
+        action='store_true',
+        help='Only include orthogonal views (pitch 0/±90, yaw 0/90/180)'
+    )
+    parser.add_argument(
+        '--any-cardinal',
+        action='store_true',
+        help='Only include views where at least one angle is cardinal (-90/0/90/180/270)'
+    )
     args = parser.parse_args()
 
     # Determine paths relative to the script location
     script_dir = Path(__file__).parent
     project_dir = script_dir.parent
 
-    json_path = project_dir / 'ship_sprites.json'
-    images_dir = project_dir / 'images'
+    input_dir = Path(args.input_dir)
+    json_path = input_dir / 'ship_sprites.json'
+    images_dir = input_dir
     output_dir = project_dir / args.output_dir
 
     # Load sprite metadata
@@ -152,7 +169,29 @@ def main():
     centered_sprites = []
     center = args.size // 2
 
-    for sprite in data['sprites']:
+    sprites_to_process = data['sprites']
+
+    if args.orthogonal_only:
+        orthogonal_pitches = {-90, 0, 90}
+        orthogonal_yaws = {0, 90, 180}
+        sprites_to_process = [
+            s for s in sprites_to_process
+            #if s['pitch'] in orthogonal_pitches and s['yaw'] in orthogonal_yaws
+            #if s['pitch'] in orthogonal_pitches or s['yaw'] == 0
+            if s['pitch'] in orthogonal_pitches
+            #if s['yaw'] == 0
+        ]
+        print(f"Filtered to {len(sprites_to_process)} orthogonal views")
+
+    if args.any_cardinal:
+        cardinal_angles = {-90, 0, 90, 180, 270}
+        sprites_to_process = [
+            s for s in sprites_to_process
+            if s['pitch'] in cardinal_angles or s['yaw'] in cardinal_angles
+        ]
+        print(f"Filtered to {len(sprites_to_process)} views with at least one cardinal angle")
+
+    for sprite in sprites_to_process:
         filename = sprite['filename']
         x_offset = sprite['x']
         y_offset = sprite['y']
