@@ -167,9 +167,9 @@ CAMERA_DATA_V21: List[CameraData] = [
     CameraData(row=1, yaw=180, pitch=30,
                camera_up=(-0.5, -0.0, 0.866025), camera_right=(-0.0, 1.0, 0.0)),
     CameraData(row=1, yaw=150, pitch=30,
-               camera_up=(-0.433013, -0.25, 0.866025), camera_right=(-0.5, 0.866025, 0.0)),
+               camera_up=(-0.433013, -0.25, 0.866025), camera_right=(0.5, -0.866025, 0.0)),
     CameraData(row=1, yaw=120, pitch=30,
-               camera_up=(-0.25, -0.433013, 0.866025), camera_right=(-0.866025, 0.5, 0.0)),
+               camera_up=(-0.25, -0.433013, 0.866025), camera_right=(0.866025, -0.5, 0.0)),
     # blocks 7-9: row 2 (pitch 0), yaw: 180 (front), 150, 120
     CameraData(row=2, yaw=180, pitch=0, type='front',
                camera_up=(0.0, 0.0, 1.0), camera_right=(-0.0, 1.0, 0.0)),
@@ -181,9 +181,9 @@ CAMERA_DATA_V21: List[CameraData] = [
     CameraData(row=3, yaw=180, pitch=-30,
                camera_up=(0.5, 0.0, 0.866025), camera_right=(-0.0, 1.0, 0.0)),
     CameraData(row=3, yaw=150, pitch=-30,
-               camera_up=(0.433013, 0.25, 0.866025), camera_right=(-0.5, 0.866025, 0.0)),
+               camera_up=(0.433013, 0.25, 0.866025), camera_right=(0.5, -0.866025, 0.0)),
     CameraData(row=3, yaw=120, pitch=-30,
-               camera_up=(0.25, 0.433013, 0.866025), camera_right=(-0.866025, 0.5, 0.0)),
+               camera_up=(0.25, 0.433013, 0.866025), camera_right=(0.866025, -0.5, 0.0)),
     # blocks 13-15: row 4 (pitch -60), yaw: 180, 150, 120
     CameraData(row=4, yaw=180, pitch=-60,
                camera_up=(0.866025, 0.0, 0.5), camera_right=(-0.0, 1.0, 0.0)),
