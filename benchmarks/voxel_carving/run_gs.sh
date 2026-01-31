@@ -48,10 +48,9 @@ DISTANCE=8
 
 source venv/bin/activate
 
+#python tools/generate_sprites_json.py --input-dir images/SHIP.V06
+#python tools/generate_sprites_json.py --input-dir images/SHIP.V08
 #python3 tools/center_sprites.py --input-dir images/SHIP.V06 --orthogonal-only
-#python3 tools/center_sprites.py --input-dir images/SHIP.V06 --any-cardinal
-
-python3 tools/center_sprites.py --input-dir images/SHIP.V06
 
 python3 -m tools.gs.sprite_to_3dgs  \
   --iterations 2000                 \
