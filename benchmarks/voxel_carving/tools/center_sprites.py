@@ -38,7 +38,7 @@ except ImportError:
 class InputSprite:
     """Raw sprite data loaded from JSON (before centering)."""
     block: int
-    row: int
+    row: Optional[int]
     yaw: float
     pitch: float
     x: int  # offset from top-left to rotation center
@@ -53,7 +53,7 @@ class InputSprite:
 class CenteredSprite:
     """Output sprite metadata (after centering)."""
     block: int
-    row: int
+    row: Optional[int]
     yaw: float
     pitch: float
     width: int
@@ -91,7 +91,7 @@ def load_sprites(json_path: Path) -> List[InputSprite]:
     for sprite in data['sprites']:
         sprites.append(InputSprite(
             block=sprite['block'],
-            row=sprite['row'],
+            row=sprite.get('row'),
             yaw=sprite['yaw'],
             pitch=sprite['pitch'],
             x=sprite['x'],
@@ -271,9 +271,12 @@ def main():
     # Filter sprites
     if args.orthogonal_only:
         orthogonal_pitches = {-90, 0, 90}
+        orthogonal_yaws = {0, 90, 180}
         sprites_to_process = [
             s for s in sprites_to_process
-            if s.pitch in orthogonal_pitches
+            if s.pitch in orthogonal_pitches and s.yaw in orthogonal_yaws
+            #if s.pitch in orthogonal_pitches or s.yaw == 0
+            #if s.yaw == 0
         ]
 
     if args.any_cardinal:

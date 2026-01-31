@@ -13,6 +13,14 @@ class LossType(str, Enum):
     L1_SSIM = "l1_ssim"
 
 
+class SymmetryType(str, Enum):
+    """Symmetry type for Gaussian model."""
+    NONE = "none"
+    Y = "y"        # left-right symmetry (about XZ plane)
+    X = "x"        # front-back symmetry (about YZ plane)
+    XY = "xy"      # both axes (quadrant symmetry)
+
+
 class TrainMode(str, Enum):
     """What to optimize during training."""
     SPLATS = "splats"           # Optimize all Gaussian splat parameters
@@ -30,7 +38,7 @@ class TrainConfig:
     device: str = 'cuda'
     train_mode: TrainMode = TrainMode.SPLATS
     loss_type: LossType = LossType.L1_SSIM
-    symmetric: bool = False
+    symmetry: SymmetryType = SymmetryType.NONE
 
 
 @dataclass
@@ -76,8 +84,8 @@ def parse_args() -> TrainingArgs:
                         help='Render all views after training')
     parser.add_argument('--render-dir', default='renders',
                         help='Output directory for rendered images')
-    parser.add_argument('--symmetric', action='store_true',
-                        help='Enable y-axis mirror symmetry (halves Gaussian count)')
+    parser.add_argument('--symmetry', choices=['none', 'y', 'x', 'xy'], default='none',
+                        help='Symmetry type: none, y (left-right), x (front-back), xy (both)')
     parser.add_argument('--init-ply', type=str, default=None,
                         help='Path to .ply file to initialize Gaussians from (skips voxel carving)')
     args = parser.parse_args()
@@ -98,7 +106,7 @@ def parse_args() -> TrainingArgs:
             device=args.device,
             train_mode=TrainMode(args.train_mode),
             loss_type=LossType(args.loss_type),
-            symmetric=args.symmetric,
+            symmetry=SymmetryType(args.symmetry),
         ),
         init_ply=args.init_ply,
     )

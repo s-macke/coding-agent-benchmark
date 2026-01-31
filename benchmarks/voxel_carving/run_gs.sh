@@ -50,7 +50,9 @@ source venv/bin/activate
 
 #python tools/generate_sprites_json.py --input-dir images/SHIP.V06
 #python tools/generate_sprites_json.py --input-dir images/SHIP.V08
-#python3 tools/center_sprites.py --input-dir images/SHIP.V06 --orthogonal-only
+
+python tools/generate_sprites_json.py --input-dir images/SHIP.V21
+python3 tools/center_sprites.py --input-dir images/SHIP.V21
 
 python3 -m tools.gs.sprite_to_3dgs  \
   --iterations 2000                 \
@@ -60,11 +62,13 @@ python3 -m tools.gs.sprite_to_3dgs  \
   --camera-type ${CAMERA}           \
   --fov ${FOV}                      \
   --train-mode splats               \
-  --symmetric                       \
+  --symmetry xy                       \
   --distance ${DISTANCE}            \
   --render                          \
   --device cuda
 
+# --symmetry y is for ships
+# --symmetry xy is the stations
 # --train-mode splats+camera
 # --train-mode camera
 

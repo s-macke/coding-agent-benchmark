@@ -29,12 +29,17 @@ from PIL import Image
 from .cameras import Cameras
 from .constants import SPRITES_JSON, SPRITES_DIR
 from .device import get_device
-from .gaussians import Gaussians, export_ply, expand_symmetric, filter_positive_y, load_ply
+from .gaussians import (
+    Gaussians, export_ply, load_ply,
+    expand_symmetric, filter_positive_y,
+    expand_symmetric_x, filter_positive_x,
+    expand_symmetric_xy, filter_positive_xy,
+)
 from .sprites import load_cameras
 from .camera import CameraCollection, CameraOptModule, rotation_6d_to_matrix
 from .losses import ssim
 from .render import render_gaussians, render_gaussians_simple, render_gsplat
-from .train_args import LossType, TrainConfig, TrainMode, parse_args
+from .train_args import LossType, SymmetryType, TrainConfig, TrainMode, parse_args
 from .voxel_carving import initialize_from_visual_hull
 
 # Training constants
@@ -54,6 +59,25 @@ POSE_OPT_WEIGHT_DECAY = 1e-6  # Regularization for pose parameters
 
 # Rendering constants
 CLAMP_EPSILON = 1e-6
+
+
+def _expand_by_symmetry(gaussians: Gaussians, symmetry: SymmetryType) -> Gaussians:
+    """Expand Gaussians based on symmetry type.
+
+    Args:
+        gaussians: Canonical Gaussians to expand
+        symmetry: Symmetry type (NONE, Y, X, or XY)
+
+    Returns:
+        Expanded Gaussians (1x, 2x, 2x, or 4x depending on symmetry)
+    """
+    if symmetry == SymmetryType.Y:
+        return expand_symmetric(gaussians)
+    elif symmetry == SymmetryType.X:
+        return expand_symmetric_x(gaussians)
+    elif symmetry == SymmetryType.XY:
+        return expand_symmetric_xy(gaussians)
+    return gaussians
 
 
 def render_all_views(
@@ -151,10 +175,16 @@ def train_gaussians(
     device = get_device(config.device)
     sh_degree = init_gaussians.sh_degree
 
-    # For symmetric mode, filter to canonical half (y >= 0)
-    if config.symmetric:
+    # For symmetric mode, filter to canonical region based on symmetry type
+    if config.symmetry == SymmetryType.Y:
         init_gaussians = filter_positive_y(init_gaussians)
-        print(f"  Symmetric mode: using {init_gaussians.num_gaussians} canonical Gaussians (y >= 0)")
+        print(f"  Y-symmetry mode: using {init_gaussians.num_gaussians} canonical Gaussians (y >= 0)")
+    elif config.symmetry == SymmetryType.X:
+        init_gaussians = filter_positive_x(init_gaussians)
+        print(f"  X-symmetry mode: using {init_gaussians.num_gaussians} canonical Gaussians (x >= 0)")
+    elif config.symmetry == SymmetryType.XY:
+        init_gaussians = filter_positive_xy(init_gaussians)
+        print(f"  XY-symmetry mode: using {init_gaussians.num_gaussians} canonical Gaussians (x >= 0, y >= 0)")
 
     images = cameras.images
     targets = torch.stack(images).to(device)
@@ -232,8 +262,8 @@ def train_gaussians(
     # Test if gsplat works
     sh_full = torch.cat([sh0, shN], dim=1)
     test_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
-    if config.symmetric:
-        test_gaussians = expand_symmetric(test_gaussians)
+    if config.symmetry != SymmetryType.NONE:
+        test_gaussians = _expand_by_symmetry(test_gaussians, config.symmetry)
     gsplat_result = render_gsplat(test_gaussians, cams[:1])
     use_gsplat = gsplat_result is not None
 
@@ -253,9 +283,9 @@ def train_gaussians(
         sh_full = torch.cat([sh0, shN], dim=1)
         current_gaussians = Gaussians(means, scales, quats, opacities, sh_full)
 
-        # For symmetric mode, expand canonical half to full model before rendering
-        if config.symmetric:
-            current_gaussians = expand_symmetric(current_gaussians)
+        # For symmetric mode, expand canonical region to full model before rendering
+        if config.symmetry != SymmetryType.NONE:
+            current_gaussians = _expand_by_symmetry(current_gaussians, config.symmetry)
 
         # Apply pose adjustment if enabled
         current_cams = cams
@@ -332,8 +362,8 @@ def train_gaussians(
                     sh_coeffs=sh_full.detach(),
                 )
                 # Expand symmetric model for saving/rendering
-                if config.symmetric:
-                    checkpoint_gaussians = expand_symmetric(checkpoint_gaussians)
+                if config.symmetry != SymmetryType.NONE:
+                    checkpoint_gaussians = _expand_by_symmetry(checkpoint_gaussians, config.symmetry)
                 if output_path is not None:
                     export_ply(checkpoint_gaussians, str(output_path))
                     print(f"  Saved {output_path}")
@@ -359,8 +389,8 @@ def train_gaussians(
     )
 
     # Expand symmetric model for final output
-    if config.symmetric:
-        result = expand_symmetric(result)
+    if config.symmetry != SymmetryType.NONE:
+        result = _expand_by_symmetry(result, config.symmetry)
 
     return result
 
