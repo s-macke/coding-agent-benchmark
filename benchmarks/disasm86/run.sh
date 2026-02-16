@@ -2,4 +2,4 @@ set -e
 
 go build ./cmd/disasm86
 
-#./disasm86 -file YESNO.COM
+./disasm86 -file YESNO.COM

@@ -6,7 +6,15 @@ var tableF67 = []string{"test", "???", "not", "neg", "mul", "imul", "div", "idiv
 var tableFe = []string{"inc", "dec", "???", "???", "???", "???", "???", "???"}
 var tableFf = []string{"inc", "dec", "call", "call", "jmp", "jmp", "push", "???"}
 
+type disasmEntry struct {
+	text   string
+	decode decodeFunc
+	flags  uint8
+	supp   []string
+}
+
 var disasmTable = [256]disasmEntry{
+	// 0x00-0x0F
 	{text: "add", decode: decode_br8},
 	{text: "add", decode: decode_wr16},
 	{text: "add", decode: decode_r8b},
@@ -23,6 +31,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "or", decode: decode_axd16},
 	{text: "push", decode: decode_pushpopseg},
 	{text: "db", decode: decode_databyte},
+	// 0x10-0x1F
 	{text: "adc", decode: decode_br8},
 	{text: "adc", decode: decode_wr16},
 	{text: "adc", decode: decode_r8b},
@@ -39,6 +48,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "sbb", decode: decode_axd16},
 	{text: "push", decode: decode_pushpopseg},
 	{text: "pop", decode: decode_pushpopseg},
+	// 0x20-0x2F
 	{text: "and", decode: decode_br8},
 	{text: "and", decode: decode_wr16},
 	{text: "and", decode: decode_r8b},
@@ -55,6 +65,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "sub", decode: decode_axd16},
 	{text: "cs:", flags: dfPrefix},
 	{text: "das"},
+	// 0x30-0x3F
 	{text: "xor", decode: decode_br8},
 	{text: "xor", decode: decode_wr16},
 	{text: "xor", decode: decode_r8b},
@@ -71,6 +82,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "cmp", decode: decode_axd16},
 	{text: "ds:", flags: dfPrefix},
 	{text: "aas"},
+	// 0x40-0x4F
 	{text: "inc", decode: decode_wordreg},
 	{text: "inc", decode: decode_wordreg},
 	{text: "inc", decode: decode_wordreg},
@@ -89,6 +101,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "dec", decode: decode_wordreg},
 	{text: "push", decode: decode_wordreg},
 	{text: "push", decode: decode_wordreg},
+	// 0x50-0x5F
 	{text: "push", decode: decode_wordreg},
 	{text: "push", decode: decode_wordreg},
 	{text: "push", decode: decode_wordreg},
@@ -103,6 +116,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "pop", decode: decode_wordreg},
 	{text: "pop", decode: decode_wordreg},
 	{text: "pop", decode: decode_wordreg},
+	// 0x60-0x6F
 	{text: "db", decode: decode_databyte},
 	{text: "db", decode: decode_databyte},
 	{text: "db", decode: decode_databyte},
@@ -121,6 +135,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "db", decode: decode_databyte},
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
+	// 0x70-0x7F
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
@@ -135,6 +150,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
 	{text: "j", decode: decode_cond_jump, flags: dfNoSpace},
+	// 0x80-0x8F
 	{text: "", decode: decode_bd8, supp: table8x},
 	{text: "", decode: decode_wd16, supp: table8x},
 	{text: "db", decode: decode_databyte},
@@ -151,6 +167,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "lea", decode: decode_r16m},
 	{text: "mov", decode: decode_sw},
 	{text: "pop", decode: decode_w},
+	// 0x90-0x9F
 	{text: "nop"},
 	{text: "xchg", decode: decode_xchgax},
 	{text: "xchg", decode: decode_xchgax},
@@ -167,6 +184,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "popf"},
 	{text: "sahf"},
 	{text: "lahf"},
+	// 0xA0-0xAF
 	{text: "mov", decode: decode_almem},
 	{text: "mov", decode: decode_axmem},
 	{text: "mov", decode: decode_memal},
@@ -183,6 +201,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "lods", decode: decode_string, flags: dfNoSpace},
 	{text: "scas", decode: decode_string, flags: dfNoSpace},
 	{text: "scas", decode: decode_string, flags: dfNoSpace},
+	// 0xB0-0xBF
 	{text: "mov", decode: decode_rd},
 	{text: "mov", decode: decode_rd},
 	{text: "mov", decode: decode_rd},
@@ -199,6 +218,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "mov", decode: decode_rd},
 	{text: "mov", decode: decode_rd},
 	{text: "mov", decode: decode_rd},
+	// 0xC0-0xCF
 	{text: "db", decode: decode_databyte},
 	{text: "db", decode: decode_databyte},
 	{text: "ret", decode: decode_d16},
@@ -215,6 +235,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "int", decode: decode_d8},
 	{text: "into"},
 	{text: "iret"},
+	// 0xD0-0xDF
 	{text: "", decode: decode_bbit1, supp: tableDx},
 	{text: "", decode: decode_wbit1, supp: tableDx},
 	{text: "", decode: decode_bbitcl, supp: tableDx},
@@ -231,6 +252,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "esc", decode: decode_escape},
 	{text: "esc", decode: decode_escape},
 	{text: "esc", decode: decode_escape},
+	// 0xE0-0xEF
 	{text: "loopne", decode: decode_disp},
 	{text: "loope", decode: decode_disp},
 	{text: "loop", decode: decode_disp},
@@ -247,6 +269,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "in", decode: decode_portdx},
 	{text: "out", decode: decode_portdx},
 	{text: "out", decode: decode_portdx},
+	// 0xF0-0xFF
 	{text: "lock", flags: dfPrefix},
 	{text: "", decode: decode_bioscall, flags: dfNoSpace},
 	{text: "repnz", flags: dfPrefix},
