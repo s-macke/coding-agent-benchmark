@@ -53,9 +53,3 @@ func (i Instruction) IsPrefix() bool {
 func NewDecoder() Decoder {
 	return decoder{}
 }
-
-// DisassembleOne decodes one instruction using a flat memory slice as the
-// physical address space.
-func DisassembleOne(seg uint16, off uint16, mem []byte) (Instruction, uint16, error) {
-	return NewDecoder().DecodeAt(seg, off, SliceSource{Data: mem})
-}

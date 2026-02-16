@@ -7,8 +7,8 @@ func TestRenderIntel(t *testing.T) {
 		Mnemonic: "mov",
 		Operands: []Operand{{Kind: OperandKindRaw, Text: "ax"}, {Kind: OperandKindRaw, Text: "1234"}},
 	}
-	if got, want := RenderIntel(inst), "mov ax,1234"; got != want {
-		t.Fatalf("RenderIntel() = %q, want %q", got, want)
+	if got, want := inst.RenderIntel(), "mov ax,1234"; got != want {
+		t.Fatalf("Instruction.RenderIntel() = %q, want %q", got, want)
 	}
 }
 
