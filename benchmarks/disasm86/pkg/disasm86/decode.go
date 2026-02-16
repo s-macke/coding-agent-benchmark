@@ -2,7 +2,6 @@ package disasm86
 
 import (
 	"fmt"
-	"strings"
 )
 
 const (
@@ -33,10 +32,6 @@ func hex16(v uint16) string {
 	return fmt.Sprintf("0x%04X", v)
 }
 
-func hex32(v uint32) string {
-	return fmt.Sprintf("0x%08X", v)
-}
-
 func (decoder) DecodeAt(seg uint16, off uint16, src ByteSource) (Instruction, uint16, error) {
 	state := decodeState{
 		src:   src,
@@ -57,13 +52,9 @@ func (decoder) DecodeAt(seg uint16, off uint16, src ByteSource) (Instruction, ui
 		if err != nil {
 			return Instruction{}, state.off, err
 		}
-		state.out.WriteString(fmt.Sprintf("%-6s ", entry.supp[(modrm&0x38)>>3]))
+		state.setMnemonic(entry.supp[(modrm&0x38)>>3])
 	} else {
-		if entry.flags&dfNoSpace != 0 {
-			state.out.WriteString(entry.text)
-		} else {
-			state.out.WriteString(fmt.Sprintf("%-6s ", entry.text))
-		}
+		state.setMnemonic(entry.text)
 	}
 
 	if entry.decode != nil {
@@ -72,8 +63,6 @@ func (decoder) DecodeAt(seg uint16, off uint16, src ByteSource) (Instruction, ui
 		}
 	}
 
-	text := strings.TrimRight(state.out.String(), " ")
-	mnemonic, operands := splitInstruction(text)
 	length := state.off - state.start
 	raw, err := readRaw(seg, state.start, length, src)
 	if err != nil {
@@ -82,43 +71,13 @@ func (decoder) DecodeAt(seg uint16, off uint16, src ByteSource) (Instruction, ui
 
 	inst := Instruction{
 		Opcode:   opcode,
-		Mnemonic: mnemonic,
-		Operands: operands,
+		Mnemonic: state.mnemonic,
+		Operands: state.operands,
 		Length:   length,
 		Prefixes: entryPrefixes(opcode, entry),
 		Raw:      raw,
-		Text:     text,
 	}
 	return inst, state.off, nil
-}
-
-func splitInstruction(text string) (string, []Operand) {
-	trimmed := strings.TrimSpace(text)
-	if trimmed == "" {
-		return "", nil
-	}
-
-	space := strings.IndexByte(trimmed, ' ')
-	if space < 0 {
-		return trimmed, nil
-	}
-
-	mnemonic := trimmed[:space]
-	rest := strings.TrimSpace(trimmed[space+1:])
-	if rest == "" {
-		return mnemonic, nil
-	}
-
-	parts := strings.Split(rest, ",")
-	operands := make([]Operand, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		operands = append(operands, Operand{Kind: OperandKindRaw, Text: part})
-	}
-	return mnemonic, operands
 }
 
 func readRaw(seg uint16, start uint16, length uint16, src ByteSource) ([]byte, error) {
@@ -278,7 +237,8 @@ func decode_cond_jump(s *decodeState) error {
 	if err != nil {
 		return err
 	}
-	s.appendf("%-5s %s", condition[s.opcode&0x0f], hex16(target))
+	s.appendMnemonicSuffix(condition[s.opcode&0x0f])
+	s.addOperand(hex16(target))
 	return nil
 }
 
@@ -441,9 +401,9 @@ func decode_memax(s *decodeState) error {
 
 func decode_string(s *decodeState) error {
 	if s.opcode&0x01 != 0 {
-		s.append("w")
+		s.appendMnemonicSuffix("w")
 	} else {
-		s.append("b")
+		s.appendMnemonicSuffix("b")
 	}
 	return nil
 }
@@ -672,22 +632,4 @@ func decode_ff(s *decodeState) error {
 		return decode_far_ind(s)
 	}
 	return decode_w(s)
-}
-
-func decode_bioscall(s *decodeState) error {
-	next, err := s.peek8()
-	if err != nil {
-		return err
-	}
-	if next == 0xf1 {
-		_, _ = s.read8()
-		addr, err := s.read32()
-		if err != nil {
-			return err
-		}
-		s.appendf("bios   %s", hex32(addr))
-		return nil
-	}
-	s.append("db     0xF1")
-	return nil
 }

@@ -2,7 +2,7 @@ package disasm86
 
 import "strings"
 
-// RenderIntel renders an instruction to normalized Intel-style text.
+// String renders an instruction to normalized Intel-style text.
 func (inst Instruction) String() string {
 	if inst.Mnemonic == "" {
 		return ""

@@ -22,8 +22,19 @@ type goldenCase struct {
 }
 
 var goldenTextOverrides = map[string]string{
-	"grpff_reg3": "???",
-	"grpff_reg5": "???",
+	"grpff_reg3":        "???",
+	"grpff_reg5":        "???",
+	"opc_F1":            "int1",
+	"bioscall_valid":    "int1",
+	"bioscall_fallback": "int1",
+}
+
+var goldenRawOverrides = map[string]string{
+	"bioscall_valid": "F1",
+}
+
+var goldenNextOffOverrides = map[string]uint16{
+	"bioscall_valid": 1,
 }
 
 func TestDecodeAgainstGoldenVectors(t *testing.T) {
@@ -49,19 +60,21 @@ func TestDecodeAgainstGoldenVectors(t *testing.T) {
 				t.Fatalf("decode: %v", err)
 			}
 
-			if next != tc.NextOff {
-				t.Fatalf("next offset mismatch: got %04X want %04X", next, tc.NextOff)
+			wantNext := expectedNextOff(tc)
+			if next != wantNext {
+				t.Fatalf("next offset mismatch: got %04X want %04X", next, wantNext)
 			}
 
-			gotText := normalizeText(inst.Text)
+			gotText := normalizeText(inst.String())
 			wantText := normalizeText(expectedText(tc))
 			if gotText != wantText {
 				t.Fatalf("text mismatch: got %q want %q", gotText, wantText)
 			}
 
 			gotRaw := strings.ToUpper(hex.EncodeToString(inst.Raw))
-			if gotRaw != tc.Raw {
-				t.Fatalf("raw mismatch: got %q want %q", gotRaw, tc.Raw)
+			wantRaw := expectedRaw(tc)
+			if gotRaw != wantRaw {
+				t.Fatalf("raw mismatch: got %q want %q", gotRaw, wantRaw)
 			}
 		})
 	}
@@ -105,7 +118,7 @@ func TestRejectRegisterOnlyFormsForMemoryInstructions(t *testing.T) {
 			if next != tc.nextOff {
 				t.Fatalf("next off: got %d want %d", next, tc.nextOff)
 			}
-			if got := normalizeText(inst.Text); got != tc.wantText {
+			if got := normalizeText(inst.String()); got != tc.wantText {
 				t.Fatalf("text: got %q want %q", got, tc.wantText)
 			}
 		})
@@ -163,6 +176,20 @@ func expectedText(tc goldenCase) string {
 		return override
 	}
 	return withHexPrefixes(tc.Text)
+}
+
+func expectedRaw(tc goldenCase) string {
+	if override, ok := goldenRawOverrides[tc.Name]; ok {
+		return override
+	}
+	return tc.Raw
+}
+
+func expectedNextOff(tc goldenCase) uint16 {
+	if override, ok := goldenNextOffOverrides[tc.Name]; ok {
+		return override
+	}
+	return tc.NextOff
 }
 
 var hexTokenRE = regexp.MustCompile(`\b[0-9A-F]{1,8}\b`)

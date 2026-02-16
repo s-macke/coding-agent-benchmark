@@ -42,7 +42,6 @@ type Instruction struct {
 	Length   uint16
 	Prefixes []Prefix
 	Raw      []byte
-	Text     string
 }
 
 func (i Instruction) IsPrefix() bool {

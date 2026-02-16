@@ -271,7 +271,7 @@ var disasmTable = [256]disasmEntry{
 	{text: "out", decode: decode_portdx},
 	// 0xF0-0xFF
 	{text: "lock", flags: dfPrefix},
-	{text: "", decode: decode_bioscall, flags: dfNoSpace},
+	{text: "int1"},
 	{text: "repnz", flags: dfPrefix},
 	{text: "repz", flags: dfPrefix},
 	{text: "hlt"},

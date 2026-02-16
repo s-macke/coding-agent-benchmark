@@ -6,12 +6,13 @@ import (
 )
 
 type decodeState struct {
-	src    ByteSource
-	seg    uint16
-	start  uint16
-	off    uint16
-	opcode byte
-	out    strings.Builder
+	src      ByteSource
+	seg      uint16
+	start    uint16
+	off      uint16
+	opcode   byte
+	mnemonic string
+	operands []Operand
 }
 
 func (s *decodeState) addr(off uint16) uint32 {
@@ -43,37 +44,36 @@ func (s *decodeState) read16() (uint16, error) {
 	return uint16(lo) | (uint16(hi) << 8), nil
 }
 
-func (s *decodeState) read32() (uint32, error) {
-	b0, err := s.read8()
-	if err != nil {
-		return 0, err
-	}
-	b1, err := s.read8()
-	if err != nil {
-		return 0, err
-	}
-	b2, err := s.read8()
-	if err != nil {
-		return 0, err
-	}
-	b3, err := s.read8()
-	if err != nil {
-		return 0, err
-	}
-	return uint32(b0) | (uint32(b1) << 8) | (uint32(b2) << 16) | (uint32(b3) << 24), nil
-}
-
 func (s *decodeState) appendf(format string, args ...any) {
-	s.out.WriteString(fmt.Sprintf(format, args...))
+	s.append(fmt.Sprintf(format, args...))
 }
 
 func (s *decodeState) append(text string) {
-	s.out.WriteString(text)
+	parts := strings.Split(text, ",")
+	for _, part := range parts {
+		s.addOperand(part)
+	}
 }
 
 func (s *decodeState) setText(text string) {
-	s.out.Reset()
-	s.out.WriteString(text)
+	s.mnemonic = strings.TrimSpace(text)
+	s.operands = nil
+}
+
+func (s *decodeState) setMnemonic(text string) {
+	s.mnemonic = strings.TrimSpace(text)
+}
+
+func (s *decodeState) appendMnemonicSuffix(suffix string) {
+	s.mnemonic += suffix
+}
+
+func (s *decodeState) addOperand(text string) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return
+	}
+	s.operands = append(s.operands, Operand{Kind: OperandKindRaw, Text: text})
 }
 
 func (s *decodeState) getMem(modrm byte, reg []string, msg string) (string, error) {

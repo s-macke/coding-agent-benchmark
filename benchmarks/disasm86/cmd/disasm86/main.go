@@ -25,7 +25,6 @@ func main() {
 	consumed := 0
 	for consumed < len(cfg.data) {
 		inst, next, err := dec.DecodeAt(cfg.seg, curr, src)
-		fmt.Println(inst.Text)
 		if err != nil {
 			exitErr(fmt.Sprintf("decode 0x%04X:0x%04X: %v", cfg.seg, curr, err))
 		}
