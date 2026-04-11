@@ -1,7 +1,7 @@
 # Decoder for the C64 Basic program
 
 
-basic_encoding.d contains a descriptions of the file formats of 
+basic_encoding.md contains a descriptions of the file formats of 
 
 * odyssee.prg
 * creator.prg
