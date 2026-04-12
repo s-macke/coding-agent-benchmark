@@ -7,11 +7,11 @@ A simplified old basic interpreter for .bas files.
 
 # Supported Statements
 
-* PRINT - output to stdout (semicolon suppresses newline)
+* PRINT - output to stdout; accepts one or more expressions or string literals separated by `;` (trailing semicolon suppresses newline)
 * INPUT - read from stdin into variable
-* LET - variable assignment (LET keyword optional)
-* FOR/NEXT - loop (step is always 1)
-* IF/THEN - conditional (no ELSE support)
+* Assignment - variable definition and assignment are implicit via `<var> = <expr>`
+* FOR/NEXT - loop using `FOR <var> = <start> TO <end>` and `NEXT <var>` (step is always 1)
+* IF/THEN - conditional; `THEN` is followed by an inline statement or list of statements (no ELSE support)
 * GOTO - jump to line number
 * END - terminate program
 * REM - comments
@@ -21,12 +21,14 @@ A simplified old basic interpreter for .bas files.
 * Arithmetic: `+`, `-`, `*`, `/`
 * Comparison: `=`, `<>`, `<`, `>`, `<=`, `>=`
 * Unary negation: `-`
-* Parentheses for grouping
+* Standard arithmetic precedence: unary negation, then `*` and `/`, then `+` and `-`
+* Parentheses for grouping and overriding precedence
+* String literals in double quotes, e.g. `"hello"`
 
 # Variables
 
-* Numeric variables (e.g., `X`) - default to 0
-* String variables (e.g., `N$`) - default to ""
+* Numeric variable names do not end with `$` (e.g., `X`) - default to 0
+* String variable names must end with `$` (e.g., `N$`) - default to ""
 * Case-insensitive names
 
 # Program Structure
@@ -34,6 +36,7 @@ A simplified old basic interpreter for .bas files.
 * Each line starts with a line number
 * Multiple statements per line separated by `:`
 * Lines execute in numeric order
+* Keywords are case-insensitive and do not require a space before the next token, e.g. `PRINT"hello"`
 
 # CLI Options
 
@@ -41,4 +44,4 @@ A simplified old basic interpreter for .bas files.
 
 # Examples
 
-* Example files in examples directory: example1.bas - example8.bas
+* Example files in examples directory: example1.bas - example12.bas
