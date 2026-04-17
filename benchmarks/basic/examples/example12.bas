@@ -1,9 +1,4 @@
-10 rem precedence, parentheses, unary negation, and string variables
-20 a = 2 + 3 * 4
-30 b = (2 + 3) * 4
-40 c = -a + 1
-50 name$ = "Ada"
-60 print"name ";name$
-70 print"precedence ";a
-80 print"parentheses ";b
-90 print"unary ";c
+10 rem inline THEN with multiple statements
+20 n = 7
+30 if n=7 then print"correct":print"value ";n:end
+40 print"wrong"

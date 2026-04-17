@@ -1,4 +1,4 @@
-10 for i=1 to 10
-20 print"hello"
-30 next i
-
+10 rem implicit variable definition by assignment
+20 x = 2
+30 y = x + 3
+40 print"values ";x;" ";y

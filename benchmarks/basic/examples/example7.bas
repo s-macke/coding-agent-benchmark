@@ -1,5 +1,4 @@
-10 print"guess a number 1-10";
-20 input g
-30 if g=7 then print"correct!":end
-40 print"wrong! try again"
-50 goto 20
+10 print"enter a number";
+20 input a
+30 b = a * (2 + 2 + 2)
+40 print"times 6 is ";b
