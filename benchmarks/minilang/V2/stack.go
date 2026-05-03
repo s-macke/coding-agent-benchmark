@@ -14,3 +14,7 @@ func (s *IntStack) Pop() int {
 	s.data = s.data[:n]
 	return v
 }
+
+func (s *IntStack) Peek() int {
+	return s.data[len(s.data)-1]
+}

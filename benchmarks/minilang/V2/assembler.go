@@ -5,25 +5,13 @@ import (
 	"io"
 )
 
-// Register conventions:
-//
-//	%rsp -- data stack pointer (uses kernel-supplied stack)
-//	%rbx -- return stack pointer (separate BSS array)
-//
-// gosub/ret swap %rsp <-> %rbx briefly so that pushq/popq operate on the
-// return stack, then swap back so the rest of the program sees the data
-// stack as usual.
-const asmPrologue = `.section .bss
-rstack: .skip 8192
-rstack_end:
-buf: .skip 32
-
-.section .text
+const asmPrologue = `.section .text
 .globl _start
 
 # print_int(rdi): writes signed decimal + '\n' to stdout
 print_int:
-    leaq buf+31(%rip), %rsi
+    subq $32, %rsp
+    leaq 31(%rsp), %rsi
     movb $10, (%rsi)
     movq %rdi, %rax
     xorq %r11, %r11
@@ -43,15 +31,15 @@ print_int:
     jz 3f
     decq %rsi
     movb $'-', (%rsi)
-3:  leaq buf+32(%rip), %rdx
+3:  leaq 32(%rsp), %rdx
     subq %rsi, %rdx
     movq $1, %rax
     movq $1, %rdi
     syscall
+    addq $32, %rsp
     ret
 
 _start:
-    leaq rstack_end(%rip), %rbx
 `
 
 func Assemble(code []Instr, w io.Writer) {
@@ -85,6 +73,9 @@ func emitInstr(w io.Writer, i int, ins Instr) {
 		fmt.Fprintf(w,
 			"    leaq Lop_%d(%%rip), %%rax\n"+
 				"    pushq %%rax\n", ins.Arg)
+	case "dup":
+		io.WriteString(w,
+			"    pushq (%rsp)\n")
 	case "+":
 		io.WriteString(w,
 			"    popq %rax\n"+
@@ -120,20 +111,6 @@ func emitInstr(w io.Writer, i int, ins Instr) {
 				"    jnz Lop_skip_%d\n"+
 				"    jmp *%%rax\n"+
 				"Lop_skip_%d:\n", i, i)
-	case "gosub":
-		fmt.Fprintf(w,
-			"    popq %%rax\n"+
-				"    leaq Lop_%d(%%rip), %%rcx\n"+
-				"    xchgq %%rsp, %%rbx\n"+
-				"    pushq %%rcx\n"+
-				"    xchgq %%rsp, %%rbx\n"+
-				"    jmp *%%rax\n", i+1)
-	case "ret":
-		io.WriteString(w,
-			"    xchgq %rsp, %rbx\n"+
-				"    popq %rax\n"+
-				"    xchgq %rsp, %rbx\n"+
-				"    jmp *%rax\n")
 	default:
 		panic("unknown instruction: " + ins.Op)
 	}

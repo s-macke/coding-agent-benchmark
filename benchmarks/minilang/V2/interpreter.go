@@ -1,8 +1,8 @@
 package main
 
 type VM struct {
-	Data, Ret IntStack
-	PC        int
+	Data IntStack
+	PC   int
 }
 
 type Op func(*VM)

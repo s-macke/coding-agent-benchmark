@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func Run(code []Instr) {
-	var data, ret IntStack
+	var data IntStack
 	pc := 0
 	for pc < len(code) {
 		ins := code[pc]
@@ -11,6 +11,8 @@ func Run(code []Instr) {
 		switch ins.Op {
 		case "push", "pushaddr":
 			data.Push(ins.Arg)
+		case "dup":
+			data.Push(data.Peek())
 		case "+":
 			a, b := data.Pop(), data.Pop()
 			data.Push(b + a)
@@ -35,12 +37,6 @@ func Run(code []Instr) {
 			if cond == 0 {
 				pc = addr
 			}
-		case "gosub":
-			addr := data.Pop()
-			ret.Push(pc)
-			pc = addr
-		case "ret":
-			pc = ret.Pop()
 		default:
 			panic("unknown instruction: " + ins.Op)
 		}

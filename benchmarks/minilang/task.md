@@ -5,11 +5,16 @@
 Programs are written as a sequence of tokens. Most operations consume values from
 the data stack and push a result back onto the stack.
 
+## Running
+
+- `minilang file.ml` runs through the interpreter.
+- `minilang -s file.ml` prints x86-64 Linux assembly.
+- `minilang -o program file.ml` writes a standalone x86-64 Linux ELF executable.
+
 ## Core Ideas
 
 - Postfix notation: `2 3 +`
 - A data stack for numbers and intermediate results
-- A separate return stack for subroutine calls
 - Labels for control flow
 - Label addresses as first-class values via `&label`
 
@@ -23,20 +28,14 @@ the data stack and push a result back onto the stack.
 
 ## Execution Model
 
-Execution starts at the first token in the file and proceeds left to right.
-
-The language has two stacks:
-
-- The data stack stores integers and label addresses.
-- The return stack stores return addresses for `gosub` and `ret`.
-
-Using a separate return stack keeps subroutine control flow independent from
-ordinary data manipulation.
+Execution starts at the first token in the file and proceeds left to right. The
+data stack stores integers and label addresses.
 
 ## Instructions
 
 ### Stack and Arithmetic
 
+- `dup` copies the top data-stack value
 - `+` pops `a` and `b`, then pushes `a + b`
 - `=` pops `a` and `b`, then pushes `1` if they are equal, otherwise `0`
 - `print` pops one value and prints it
@@ -77,17 +76,6 @@ condition &target ifnot
 - `if` pops a target address and a condition, then jumps if the condition is nonzero
 - `ifnot` pops a target address and a condition, then jumps if the condition is zero
 
-### Subroutines
-
-```minilang
-&routine gosub
-ret
-```
-
-- `gosub` pops a target address, pushes the next instruction address onto the
-  return stack, and jumps
-- `ret` pops the return stack and resumes execution there
-
 ## Examples
 
 Addition:
@@ -124,6 +112,20 @@ loop:
 ```
 
 See [examples/loop.ml](examples/loop.ml).
+
+Count from 1 through 10 with a loop:
+
+```minilang
+1
+loop:
+dup print
+dup 10 = &done if
+1 +
+&loop goto
+done:
+```
+
+See [examples/count_to_ten_loop.ml](examples/count_to_ten_loop.ml).
 
 Forward jump:
 
@@ -167,33 +169,16 @@ done:
 
 See [examples/ifnot.ml](examples/ifnot.ml).
 
-Subroutine call:
-
-```minilang
-&hello gosub
-0 print
-&done goto
-
-hello:
-1 print
-ret
-
-done:
-```
-
-See [examples/gosub.ml](examples/gosub.ml).
-
 ## Summary
 
 `minilang` is intentionally small. The current language consists of:
 
 - integer literals
 - labels and label addresses
+- `dup`
 - `+`
 - `=`
 - `print`
 - `goto`
 - `if`
 - `ifnot`
-- `gosub`
-- `ret`

@@ -15,6 +15,8 @@ func compileOne(ins Instr) Op {
 	case "push", "pushaddr":
 		arg := ins.Arg
 		return func(v *VM) { v.Data.Push(arg) }
+	case "dup":
+		return func(v *VM) { v.Data.Push(v.Data.Peek()) }
 	case "+":
 		return func(v *VM) {
 			a, b := v.Data.Pop(), v.Data.Pop()
@@ -47,14 +49,6 @@ func compileOne(ins Instr) Op {
 				v.PC = addr
 			}
 		}
-	case "gosub":
-		return func(v *VM) {
-			addr := v.Data.Pop()
-			v.Ret.Push(v.PC)
-			v.PC = addr
-		}
-	case "ret":
-		return func(v *VM) { v.PC = v.Ret.Pop() }
 	}
 	panic("unknown instruction: " + ins.Op)
 }
